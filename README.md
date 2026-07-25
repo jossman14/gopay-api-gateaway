@@ -334,9 +334,25 @@ GET http://vps-ip:3000/create-qris?amount=25000&api_key=RAHASIA
 }
 ```
 
+### `GET /qr/:id` — Halaman Pembayaran QRIS Interaktif (Web UI)
+Membuka halaman HTML pembayaran QRIS yang interaktif. Dilengkapi dengan:
+- **Tombol Cek Manual ("🔄 Cek Status Pembayaran")** — *(Paling Aman / Anti-Banned)* Pengecekan 1x klik instan setelah pembeli transfer.
+- **Hitung Mundur Kedaluwarsa 5 Menit** — Countdown visual batas waktu transaksi.
+- **Checkbox Toggle Auto-Polling (Opsional)** — Off secara default untuk proteksi rate-limit. Jika dicentang pembeli, mengecek status setiap 8 detik di background.
+- Format gambar mentah bisa diakses dengan query `?format=raw` atau `?raw=1`.
+
 ---
 
-### `GET /check-payment` — Cek Pembayaran Masuk
+### `GET /api/qr-status/:id` — Status Check Public (Tanpa API Key)
+Endpoint public yang digunakan oleh halaman HTML `/qr/:id` untuk memeriksa status pembayaran tanpa perlu mengekspos `API_KEY` di browser pembeli.
+
+```http
+GET http://vps-ip:3000/api/qr-status/abc123xyz
+```
+
+---
+
+### `GET /check-payment` — Cek Pembayaran Masuk (Backend / Server-to-Server)
 Mencari transaksi yang cocok berdasarkan nominal dan timestamp. Setiap transaksi hanya bisa diklaim 1x (anti klaim ganda).
 ```http
 GET http://vps-ip:3000/check-payment?amount=25000&api_key=RAHASIA
