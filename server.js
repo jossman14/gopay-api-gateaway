@@ -13,6 +13,8 @@ const QRIS_EXPIRY_MS = 5 * 60 * 1000; // 5 menit
 const GOJEK_TRANSACTIONS_URL = 'https://api.gojekapi.com/merchant-analytics/v2/merchants/transactions';
 
 
+// claimedTransactions: Map<txId, { qrisId: string|null, claimedAt: number }>
+// Menyimpan mapping txId -> qrisId agar satu transaksi tidak bisa diklaim oleh dua QRIS berbeda
 const claimedTransactions = new Map();
 const activityLogs = [];
 const qrisStore = new Map();
@@ -41,8 +43,9 @@ function logActivity(type, message, details = null) {
 // Clean up expired claimed transactions
 function cleanExpiredTransactions() {
     const now = Date.now();
-    for (const [txId, savedAt] of claimedTransactions.entries()) {
-        if (now - savedAt > CLAIMED_CLEANUP_INTERVAL_MS) {
+    for (const [txId, claim] of claimedTransactions.entries()) {
+        const claimedAt = typeof claim === 'object' ? claim.claimedAt : claim;
+        if (now - claimedAt > CLAIMED_CLEANUP_INTERVAL_MS) {
             claimedTransactions.delete(txId);
         }
     }
@@ -214,12 +217,15 @@ app.all('/create-qris', apiKeyAuth, (req, res) => {
 
     const dynamicCode = generateDynamicQRIS(staticTemplate, amount);
     const qrisId = Math.random().toString(36).substring(2, 10);
+    // TRX-ID unik per payment — dipakai sebagai scope klaim agar tidak tabrakan dengan payment lain
+    const trxId = 'TRX-' + Math.random().toString(36).substring(2, 10).toUpperCase();
     const expiresAt = new Date(Date.now() + QRIS_EXPIRY_MS);
     const createdAt = new Date();
 
     qrisStore.set(qrisId, {
         data: dynamicCode,
         amount: parseInt(amount, 10),
+        trxId,
         expiresAt,
         createdAt,
         status: 'PENDING'
@@ -229,12 +235,13 @@ app.all('/create-qris', apiKeyAuth, (req, res) => {
     const protocol = req.protocol;
     const publicUrl = `${protocol}://${host}/qr/${qrisId}`;
 
-    logActivity('INFO', `QRIS Dinamis dibuat untuk nominal: Rp ${amount}`);
+    logActivity('INFO', `QRIS Dinamis dibuat | TRX-ID: ${trxId} | Nominal: Rp ${amount}`);
 
     res.json({
         success: true,
         data: {
             qris_id: qrisId,
+            trx_id: trxId,
             qris_url: publicUrl,
             qris_code: dynamicCode,
             amount: parseInt(amount, 10),
@@ -555,7 +562,8 @@ app.get('/transactions/all', apiKeyAuth, async (req, res) => {
 });
 
 // Core Helper: Verifikasi Pembayaran dari GoPay API
-async function verifyPayment(amount, startTime, merchantIdOverride = null, userAgent = null) {
+// qrisId: scope klaim — satu txId hanya bisa diklaim oleh satu qrisId
+async function verifyPayment(amount, startTime, merchantIdOverride = null, userAgent = null, qrisId = null) {
     let headers = await sessionManager.getValidHeaders(userAgent);
     if (!headers) {
         throw new Error('Sesi GoPay belum ada. Jalankan `node login.js` di terminal.');
@@ -610,8 +618,12 @@ async function verifyPayment(amount, startTime, merchantIdOverride = null, userA
         const txId = tx.id || tx.order_id || tx.wallstreet_transaction_id;
 
         if (txAmount === targetAmount && txTimestamp >= filterStartTimeMs) {
-            if (!claimedTransactions.has(txId)) {
-                claimedTransactions.set(txId, Date.now());
+            const existingClaim = claimedTransactions.get(txId);
+
+            if (!existingClaim) {
+                // Transaksi belum diklaim siapapun → klaim sekarang
+                claimedTransactions.set(txId, { qrisId, claimedAt: Date.now() });
+                logActivity('INFO', `TRX ${txId} diklaim oleh QRIS ${qrisId || 'manual-check'}`);
                 return {
                     transaction_id: txId,
                     order_id: tx.order_id,
@@ -620,6 +632,20 @@ async function verifyPayment(amount, startTime, merchantIdOverride = null, userA
                     payment_type: tx.payment_type || tx.transaction_source || 'GOPAY_INSTORE',
                     transaction_time: tx.transaction_time || tx.settlement_time
                 };
+            } else if (qrisId && existingClaim.qrisId === qrisId) {
+                // Re-check dari QRIS yang sama → kembalikan hasil yang sudah diklaim
+                return {
+                    transaction_id: txId,
+                    order_id: tx.order_id,
+                    amount: txAmount,
+                    payer_issuer: tx.qris_provider_aspi_issuer || 'GoPay / Bank',
+                    payment_type: tx.payment_type || tx.transaction_source || 'GOPAY_INSTORE',
+                    transaction_time: tx.transaction_time || tx.settlement_time
+                };
+            } else {
+                // Transaksi ini sudah diklaim oleh QRIS lain → skip, cari transaksi berikutnya
+                logActivity('INFO', `TRX ${txId} sudah diklaim oleh QRIS ${existingClaim.qrisId || 'lain'}, skip untuk QRIS ${qrisId}`);
+                continue;
             }
         }
     }
@@ -628,7 +654,8 @@ async function verifyPayment(amount, startTime, merchantIdOverride = null, userA
 
 // Endpoint Public Check Status QRIS (Dipanggil oleh Halaman Frontend HTML QRIS tanpa butuh API Key)
 app.get('/api/qr-status/:id', async (req, res) => {
-    const qris = qrisStore.get(req.params.id);
+    const qrisId = req.params.id;
+    const qris = qrisStore.get(qrisId);
     if (!qris) {
         return res.json({ success: false, status: 'NOT_FOUND', message: 'QRIS tidak ditemukan' });
     }
@@ -638,17 +665,18 @@ app.get('/api/qr-status/:id', async (req, res) => {
     }
 
     if (Date.now() > qris.expiresAt.getTime()) {
-        qrisStore.delete(req.params.id);
+        qrisStore.delete(qrisId);
         return res.json({ success: false, paid: false, status: 'EXPIRED', message: 'QRIS sudah kedaluwarsa' });
     }
 
     try {
-        const matched = await verifyPayment(qris.amount, qris.createdAt, null, req.headers['user-agent']);
+        // Pakai trx_id sebagai scope klaim agar transaksi hanya bisa diklaim oleh payment ini
+        const matched = await verifyPayment(qris.amount, qris.createdAt, null, req.headers['user-agent'], qris.trxId || qrisId);
         if (matched) {
             qris.status = 'PAID';
             qris.transaction = matched;
-            qrisStore.set(req.params.id, qris);
-            logActivity('SUCCESS', `Pembayaran QRIS ID ${req.params.id} terverifikasi lunas untuk nominal Rp ${qris.amount}`);
+            qrisStore.set(qrisId, qris);
+            logActivity('SUCCESS', `Pembayaran QRIS ID ${qrisId} terverifikasi lunas untuk nominal Rp ${qris.amount}`);
             return res.json({ success: true, paid: true, status: 'PAID', transaction: matched });
         }
         return res.json({ success: true, paid: false, status: 'PENDING', message: 'Belum ada pembayaran masuk' });
@@ -658,9 +686,12 @@ app.get('/api/qr-status/:id', async (req, res) => {
 });
 
 // Cek Pembayaran Masuk (Support GET query & POST body)
+// Opsional: sertakan qris_id atau trx_id sebagai scope klaim agar tidak konflik dengan payment lain
 app.all('/check-payment', apiKeyAuth, async (req, res) => {
     const amount = req.body?.amount || req.query?.amount;
     const startTime = req.body?.startTime || req.query?.startTime || req.query?.start_time;
+    // trx_id dipakai sebagai scope klaim agar tidak tabrakan dengan payment nominal sama
+    const scopeId = req.body?.trx_id || req.query?.trx_id || null;
 
     if (!amount || isNaN(amount)) {
         return res.status(400).json({ success: false, message: 'Nominal pembayaran tidak valid' });
@@ -668,7 +699,7 @@ app.all('/check-payment', apiKeyAuth, async (req, res) => {
 
     try {
         const merchantId = req.headers['x-gopay-merchant-id'] || null;
-        const matchedTransaction = await verifyPayment(amount, startTime, merchantId, req.headers['user-agent']);
+        const matchedTransaction = await verifyPayment(amount, startTime, merchantId, req.headers['user-agent'], scopeId);
 
         if (matchedTransaction) {
             logActivity('SUCCESS', `Pembayaran terverifikasi lunas untuk nominal Rp ${parseInt(amount, 10)}`, matchedTransaction);
