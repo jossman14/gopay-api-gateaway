@@ -81,32 +81,64 @@ function calculateCRC16(payload) {
     return crc.toString(16).toUpperCase().padStart(4, '0');
 }
 
-// Generate QRIS Dinamis dengan nominal custom
+// Generate QRIS Dinamis Standar EMVCo (Parsing TLV Presisi Tinggi)
 function generateDynamicQRIS(staticTemplate, amount) {
     if (!staticTemplate) return null;
-    let base = staticTemplate.slice(0, -4);
-    if (base.endsWith('6304')) base = base.slice(0, -4);
+    let payload = staticTemplate.trim();
+
+    // Hapus Tag 63 (CRC) lama jika ada di akhir
+    const idx63 = payload.indexOf('6304');
+    if (idx63 !== -1) {
+        payload = payload.substring(0, idx63);
+    }
+
+    // Parse EMVCo TLV Tags
+    const tags = [];
+    let i = 0;
+    try {
+        while (i < payload.length) {
+            const tag = payload.substring(i, i + 2);
+            const length = parseInt(payload.substring(i + 2, i + 4), 10);
+            if (isNaN(length)) break;
+            const val = payload.substring(i + 4, i + 4 + length);
+            tags.push({ tag, val });
+            i += 4 + length;
+        }
+    } catch (e) {
+        return null;
+    }
 
     const amountStr = parseInt(amount, 10).toString();
-    const tag54Length = amountStr.length.toString().padStart(2, '0');
-    const tag54 = `54${tag54Length}${amountStr}`;
+    const newTags = [];
+    let hasTag54 = false;
 
-    let result = base;
-    if (result.includes('54')) {
-        result = result.replace(/54\d{2}\d+/, tag54);
-    } else {
-        const idx58 = result.indexOf('5802');
-        if (idx58 !== -1) {
-            result = result.slice(0, idx58) + tag54 + result.slice(idx58);
+    for (const item of tags) {
+        if (item.tag === '01') {
+            // Ubah Static (11) ke Dynamic (12)
+            newTags.push({ tag: '01', val: '12' });
+        } else if (item.tag === '54') {
+            newTags.push({ tag: '54', val: amountStr });
+            hasTag54 = true;
+        } else if (item.tag === '58' && !hasTag54) {
+            newTags.push({ tag: '54', val: amountStr });
+            hasTag54 = true;
+            newTags.push(item);
         } else {
-            result += tag54;
+            newTags.push(item);
         }
     }
 
-    if (!result.endsWith('6304')) {
-        result += '6304';
+    if (!hasTag54) {
+        newTags.push({ tag: '54', val: amountStr });
     }
 
+    let result = '';
+    for (const item of newTags) {
+        const lenStr = item.val.length.toString().padStart(2, '0');
+        result += `${item.tag}${lenStr}${item.val}`;
+    }
+
+    result += '6304';
     const checksum = calculateCRC16(result);
     return result + checksum;
 }
@@ -183,8 +215,15 @@ app.all('/create-qris', apiKeyAuth, (req, res) => {
     const dynamicCode = generateDynamicQRIS(staticTemplate, amount);
     const qrisId = Math.random().toString(36).substring(2, 10);
     const expiresAt = new Date(Date.now() + QRIS_EXPIRY_MS);
+    const createdAt = new Date();
 
-    qrisStore.set(qrisId, { data: dynamicCode, expiresAt });
+    qrisStore.set(qrisId, {
+        data: dynamicCode,
+        amount: parseInt(amount, 10),
+        expiresAt,
+        createdAt,
+        status: 'PENDING'
+    });
 
     const host = req.get('host');
     const protocol = req.protocol;
@@ -195,6 +234,7 @@ app.all('/create-qris', apiKeyAuth, (req, res) => {
     res.json({
         success: true,
         data: {
+            qris_id: qrisId,
             qris_url: publicUrl,
             qris_code: dynamicCode,
             amount: parseInt(amount, 10),
@@ -204,16 +244,233 @@ app.all('/create-qris', apiKeyAuth, (req, res) => {
     });
 });
 
-// Render QR Code Image Redirect
+// Render Halaman HTML QRIS Interaktif (Tombol Cek Manual + Auto Polling Toggle)
 app.get('/qr/:id', (req, res) => {
     const qris = qrisStore.get(req.params.id);
-    if (!qris) return res.status(404).send('Gambar QRIS tidak ditemukan');
-    if (Date.now() > qris.expiresAt.getTime()) {
-        qrisStore.delete(req.params.id);
-        return res.status(410).send('Gambar QRIS sudah kedaluwarsa');
+    if (!qris) {
+        return res.status(404).send('<h3>Gambar QRIS tidak ditemukan atau telah dihapus</h3>');
     }
-    const qrServerUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qris.data)}`;
-    res.redirect(302, qrServerUrl);
+
+    // Jika dipanggil via query format=raw / raw=1, redirect ke gambar mentah
+    if (req.query.format === 'raw' || req.query.raw === '1') {
+        if (Date.now() > qris.expiresAt.getTime()) {
+            qrisStore.delete(req.params.id);
+            return res.status(410).send('QRIS Kedaluwarsa');
+        }
+        const qrServerUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qris.data)}`;
+        return res.redirect(302, qrServerUrl);
+    }
+
+    const formattedAmount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(qris.amount);
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(qris.data)}`;
+    const expiresTimestamp = qris.expiresAt.getTime();
+
+    const html = `<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pembayaran QRIS - ${formattedAmount}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 20px; width: 100%; max-width: 420px; padding: 28px 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); text-align: center; }
+        .badge-qris { display: inline-flex; align-items: center; gap: 6px; background: rgba(0, 174, 217, 0.15); color: #38bdf8; font-weight: 600; font-size: 13px; padding: 6px 14px; border-radius: 20px; border: 1px solid rgba(56, 189, 248, 0.3); margin-bottom: 16px; }
+        .amount-title { font-size: 14px; color: #94a3b8; margin-bottom: 4px; }
+        .amount-value { font-size: 28px; font-weight: 700; color: #38bdf8; letter-spacing: -0.5px; margin-bottom: 20px; }
+        .qr-wrapper { background: #ffffff; padding: 16px; border-radius: 16px; display: inline-block; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); margin-bottom: 20px; position: relative; }
+        .qr-wrapper img { display: block; width: 240px; height: 240px; border-radius: 8px; }
+        .timer-box { font-size: 14px; color: #cbd5e1; background: #0f172a; padding: 10px 16px; border-radius: 12px; border: 1px solid #334155; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .timer-val { font-weight: 700; color: #f59e0b; font-family: monospace; font-size: 16px; }
+        .status-badge { display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; font-size: 14px; padding: 12px; border-radius: 12px; margin-bottom: 20px; transition: all 0.3s ease; }
+        .status-pending { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .status-paid { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+        .status-expired { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .btn-check { width: 100%; background: #0284c7; hover: #0369a1; color: #ffffff; border: none; font-weight: 600; font-size: 15px; padding: 14px; border-radius: 12px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 6px -1px rgba(2, 132, 199, 0.3); }
+        .btn-check:hover { background: #0369a1; transform: translateY(-1px); }
+        .btn-check:disabled { background: #475569; cursor: not-allowed; opacity: 0.7; transform: none; }
+        .toggle-box { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 13px; color: #94a3b8; margin-top: 16px; }
+        .toggle-box input[type="checkbox"] { width: 16px; height: 16px; accent-color: #0284c7; cursor: pointer; }
+        .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; display: none; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .success-box { display: none; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 12px; padding: 16px; text-align: left; font-size: 13px; color: #cbd5e1; margin-top: 16px; }
+        .success-box strong { color: #4ade80; display: block; font-size: 15px; margin-bottom: 6px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="badge-qris">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            GoPay / QRIS Dinamis
+        </div>
+
+        <div class="amount-title">Total Pembayaran</div>
+        <div class="amount-value">${formattedAmount}</div>
+
+        <div class="qr-wrapper" id="qr-container">
+            <img src="${qrImageUrl}" alt="QRIS Code">
+        </div>
+
+        <div class="timer-box">
+            <span>Batas Waktu Pembayaran</span>
+            <span class="timer-val" id="timer-text">05:00</span>
+        </div>
+
+        <div class="status-badge status-pending" id="status-badge">
+            <span id="status-icon">🟡</span>
+            <span id="status-text">Menunggu Pembayaran</span>
+        </div>
+
+        <button class="btn-check" id="btn-check" onclick="checkStatusManual()">
+            <span class="spinner" id="btn-spinner"></span>
+            <span id="btn-label">🔄 Cek Status Pembayaran</span>
+        </button>
+
+        <div class="toggle-box">
+            <input type="checkbox" id="chk-auto" onchange="handleAutoPollChange(this)">
+            <label for="chk-auto">Cek otomatis setiap 8 detik (Opsional)</label>
+        </div>
+
+        <div class="success-box" id="success-details">
+            <strong>✅ Pembayaran Berhasil!</strong>
+            <p>Order ID: <span id="tx-order"></span></p>
+            <p>Sumber: <span id="tx-issuer"></span></p>
+            <p>Waktu: <span id="tx-time"></span></p>
+        </div>
+    </div>
+
+    <script>
+        const qrisId = "${req.params.id}";
+        const expiresTimestamp = ${expiresTimestamp};
+        let isChecking = false;
+        let isPaid = false;
+        let isExpired = false;
+        let pollTimer = null;
+
+        function updateCountdown() {
+            if (isPaid) return;
+            const now = Date.now();
+            const diff = expiresTimestamp - now;
+
+            if (diff <= 0) {
+                isExpired = true;
+                document.getElementById('timer-text').innerText = "00:00";
+                document.getElementById('status-badge').className = "status-badge status-expired";
+                document.getElementById('status-icon').innerText = "🔴";
+                document.getElementById('status-text').innerText = "QRIS Kedaluwarsa";
+                document.getElementById('btn-check').disabled = true;
+                document.getElementById('chk-auto').disabled = true;
+                clearInterval(countdownInterval);
+                stopAutoPoll();
+                return;
+            }
+
+            const minutes = Math.floor(diff / 60000);
+            const seconds = Math.floor((diff % 60000) / 1000);
+            document.getElementById('timer-text').innerText = 
+                String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+        }
+
+        const countdownInterval = setInterval(updateCountdown, 1000);
+        updateCountdown();
+
+        async function checkStatusManual() {
+            if (isChecking || isPaid || isExpired) return;
+            isChecking = true;
+
+            const btn = document.getElementById('btn-check');
+            const spinner = document.getElementById('btn-spinner');
+            const label = document.getElementById('btn-label');
+
+            btn.disabled = true;
+            spinner.style.display = 'inline-block';
+            label.innerText = 'Memeriksa...';
+
+            try {
+                const res = await fetch('/api/qr-status/' + qrisId);
+                const data = await res.json();
+
+                if (data.success && data.paid) {
+                    onPaymentSuccess(data.transaction);
+                } else if (data.status === 'EXPIRED') {
+                    isExpired = true;
+                    updateCountdown();
+                } else {
+                    document.getElementById('status-text').innerText = "Belum Dibayar (Dicoba lagi...)";
+                    setTimeout(() => {
+                        if (!isPaid && !isExpired) {
+                            document.getElementById('status-text').innerText = "Menunggu Pembayaran";
+                        }
+                    }, 2000);
+                }
+            } catch (err) {
+                console.error("Gagal periksa status:", err);
+            } finally {
+                isChecking = false;
+                if (!isPaid && !isExpired) {
+                    btn.disabled = false;
+                }
+                spinner.style.display = 'none';
+                label.innerText = '🔄 Cek Status Pembayaran';
+            }
+        }
+
+        function onPaymentSuccess(tx) {
+            isPaid = true;
+            stopAutoPoll();
+            clearInterval(countdownInterval);
+
+            document.getElementById('status-badge').className = "status-badge status-paid";
+            document.getElementById('status-icon').innerText = "🟢";
+            document.getElementById('status-text').innerText = "Pembayaran Berhasil / Lunas";
+
+            const btn = document.getElementById('btn-check');
+            btn.disabled = true;
+            btn.style.display = 'none';
+
+            if (tx) {
+                document.getElementById('tx-order').innerText = tx.order_id || tx.transaction_id || '-';
+                document.getElementById('tx-issuer').innerText = tx.payer_issuer || 'GoPay / Bank';
+                document.getElementById('tx-time').innerText = tx.transaction_time ? new Date(tx.transaction_time).toLocaleString('id-ID') : '-';
+                document.getElementById('success-details').style.display = 'block';
+            }
+        }
+
+        function startAutoPoll() {
+            stopAutoPoll();
+            pollTimer = setInterval(() => {
+                if (!isChecking && !isPaid && !isExpired) {
+                    checkStatusManual();
+                }
+            }, 8000);
+        }
+
+        function stopAutoPoll() {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        }
+
+        function handleAutoPollChange(chk) {
+            if (chk.checked) {
+                startAutoPoll();
+            } else {
+                stopAutoPoll();
+            }
+        }
+
+        // Start auto poll on load if checked
+        if (document.getElementById('chk-auto').checked) {
+            startAutoPoll();
+        }
+    </script>
+</body>
+</html>`;
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
 });
 
 // Ambil Riwayat Transaksi
@@ -297,94 +554,124 @@ app.get('/transactions/all', apiKeyAuth, async (req, res) => {
     return app._router.handle({ ...req, url: '/transactions', method: 'GET' }, res);
 });
 
+// Core Helper: Verifikasi Pembayaran dari GoPay API
+async function verifyPayment(amount, startTime, merchantIdOverride = null, userAgent = null) {
+    let headers = await sessionManager.getValidHeaders(userAgent);
+    if (!headers) {
+        throw new Error('Sesi GoPay belum ada. Jalankan `node login.js` di terminal.');
+    }
+
+    const fetchCheckPayment = async (activeHeaders) => {
+        const merchantId = merchantIdOverride || process.env.GOPAY_MERCHANT_ID || '';
+        const now = new Date();
+        const startTimeISO = startTime ? new Date(startTime).toISOString() : new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+        const endTimeISO = now.toISOString();
+
+        return await axios.get(GOJEK_TRANSACTIONS_URL, {
+            headers: activeHeaders,
+            params: {
+                from: 0,
+                size: 20,
+                statuses: 'SETTLEMENT,CAPTURE,REFUND,PARTIAL_REFUND',
+                payment_types: 'QRIS,GOPAY,OFFLINE_CREDIT_CARD,OFFLINE_DEBIT_CARD,CREDIT_CARD',
+                start_time: startTimeISO,
+                end_time: endTimeISO,
+                merchant_ids: merchantId
+            },
+            timeout: 10000
+        });
+    };
+
+    let response;
+    try {
+        response = await fetchCheckPayment(headers);
+    } catch (firstErr) {
+        if (firstErr.response && firstErr.response.status === 401) {
+            logActivity('WARNING', 'Sesi expired (401) di verifyPayment. Memulai auto-refresh...');
+            const refreshed = await sessionManager.refreshSession();
+            if (refreshed) {
+                const newHeaders = await sessionManager.getValidHeaders(userAgent);
+                response = await fetchCheckPayment(newHeaders);
+            } else {
+                throw firstErr;
+            }
+        } else {
+            throw firstErr;
+        }
+    }
+
+    const rawTransactions = response.data?.transactions || response.data?.data?.transactions || response.data?.data || [];
+    const targetAmount = parseInt(amount, 10);
+    const filterStartTimeMs = startTime ? new Date(startTime).getTime() : 0;
+
+    for (const tx of rawTransactions) {
+        const txAmount = parseInt(tx.gross_amount || tx.real_gross_amount || tx.amount?.value || tx.amount || 0, 10);
+        const txTimestamp = new Date(tx.transaction_time || tx.created_at || tx.settlement_time || 0).getTime();
+        const txId = tx.id || tx.order_id || tx.wallstreet_transaction_id;
+
+        if (txAmount === targetAmount && txTimestamp >= filterStartTimeMs) {
+            if (!claimedTransactions.has(txId)) {
+                claimedTransactions.set(txId, Date.now());
+                return {
+                    transaction_id: txId,
+                    order_id: tx.order_id,
+                    amount: txAmount,
+                    payer_issuer: tx.qris_provider_aspi_issuer || 'GoPay / Bank',
+                    payment_type: tx.payment_type || tx.transaction_source || 'GOPAY_INSTORE',
+                    transaction_time: tx.transaction_time || tx.settlement_time
+                };
+            }
+        }
+    }
+    return null;
+}
+
+// Endpoint Public Check Status QRIS (Dipanggil oleh Halaman Frontend HTML QRIS tanpa butuh API Key)
+app.get('/api/qr-status/:id', async (req, res) => {
+    const qris = qrisStore.get(req.params.id);
+    if (!qris) {
+        return res.json({ success: false, status: 'NOT_FOUND', message: 'QRIS tidak ditemukan' });
+    }
+
+    if (qris.status === 'PAID') {
+        return res.json({ success: true, paid: true, status: 'PAID', transaction: qris.transaction });
+    }
+
+    if (Date.now() > qris.expiresAt.getTime()) {
+        qrisStore.delete(req.params.id);
+        return res.json({ success: false, paid: false, status: 'EXPIRED', message: 'QRIS sudah kedaluwarsa' });
+    }
+
+    try {
+        const matched = await verifyPayment(qris.amount, qris.createdAt, null, req.headers['user-agent']);
+        if (matched) {
+            qris.status = 'PAID';
+            qris.transaction = matched;
+            qrisStore.set(req.params.id, qris);
+            logActivity('SUCCESS', `Pembayaran QRIS ID ${req.params.id} terverifikasi lunas untuk nominal Rp ${qris.amount}`);
+            return res.json({ success: true, paid: true, status: 'PAID', transaction: matched });
+        }
+        return res.json({ success: true, paid: false, status: 'PENDING', message: 'Belum ada pembayaran masuk' });
+    } catch (err) {
+        return res.json({ success: false, paid: false, status: 'PENDING', message: err.message });
+    }
+});
+
 // Cek Pembayaran Masuk (Support GET query & POST body)
 app.all('/check-payment', apiKeyAuth, async (req, res) => {
     const amount = req.body?.amount || req.query?.amount;
     const startTime = req.body?.startTime || req.query?.startTime || req.query?.start_time;
-    let headers = await sessionManager.getValidHeaders(req.headers['user-agent']);
 
-    if (!headers && process.env.GOPAY_EMAIL && process.env.GOPAY_PASSWORD) {
-        logActivity('INFO', 'Sesi tidak ditemukan, memicu auto-login...');
-        await autoLoginGojek();
-        headers = await sessionManager.getValidHeaders(req.headers['user-agent']);
-    }
-
-    if (!headers) {
-        return res.status(400).json({
-            success: false,
-            message: 'Sesi GoPay belum ada. Jalankan `node login.js` di terminal.'
-        });
+    if (!amount || isNaN(amount)) {
+        return res.status(400).json({ success: false, message: 'Nominal pembayaran tidak valid' });
     }
 
     try {
-        const fetchCheckPayment = async (activeHeaders) => {
-            const merchantId = req.headers['x-gopay-merchant-id'] || process.env.GOPAY_MERCHANT_ID || '';
-            const now = new Date();
-            const startTimeISO = startTime ? new Date(startTime).toISOString() : new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-            const endTimeISO = now.toISOString();
-
-            return await axios.get(GOJEK_TRANSACTIONS_URL, {
-                headers: activeHeaders,
-                params: {
-                    from: 0,
-                    size: 20,
-                    statuses: 'SETTLEMENT,CAPTURE,REFUND,PARTIAL_REFUND',
-                    payment_types: 'QRIS,GOPAY,OFFLINE_CREDIT_CARD,OFFLINE_DEBIT_CARD,CREDIT_CARD',
-                    start_time: startTimeISO,
-                    end_time: endTimeISO,
-                    merchant_ids: merchantId
-                },
-                timeout: 10000
-            });
-        };
-
-        let response;
-        try {
-            response = await fetchCheckPayment(headers);
-        } catch (firstErr) {
-            if (firstErr.response && firstErr.response.status === 401) {
-                logActivity('WARNING', 'Sesi expired (401) di /check-payment. Memulai auto-refresh...');
-                const refreshed = await sessionManager.refreshSession();
-                if (refreshed) {
-                    const newHeaders = await sessionManager.getValidHeaders(req.headers['user-agent']);
-                    response = await fetchCheckPayment(newHeaders);
-                } else {
-                    throw firstErr;
-                }
-            } else {
-                throw firstErr;
-            }
-        }
-
-        const rawTransactions = response.data?.transactions || response.data?.data?.transactions || response.data?.data || [];
-        const targetAmount = parseInt(amount, 10);
-        const filterStartTimeMs = startTime ? new Date(startTime).getTime() : 0;
-
-        let matchedTransaction = null;
-
-        for (const tx of rawTransactions) {
-            const txAmount = parseInt(tx.gross_amount || tx.real_gross_amount || tx.amount?.value || tx.amount || 0, 10);
-            const txTimestamp = new Date(tx.transaction_time || tx.created_at || tx.settlement_time || 0).getTime();
-            const txId = tx.id || tx.order_id || tx.wallstreet_transaction_id;
-
-            if (txAmount === targetAmount && txTimestamp >= filterStartTimeMs) {
-                if (!claimedTransactions.has(txId)) {
-                    claimedTransactions.set(txId, Date.now());
-                    matchedTransaction = {
-                        transaction_id: txId,
-                        order_id: tx.order_id,
-                        amount: txAmount,
-                        payer_issuer: tx.qris_provider_aspi_issuer || 'GoPay / Bank',
-                        payment_type: tx.payment_type || tx.transaction_source || 'GOPAY_INSTORE',
-                        transaction_time: tx.transaction_time || tx.settlement_time
-                    };
-                    break;
-                }
-            }
-        }
+        const merchantId = req.headers['x-gopay-merchant-id'] || null;
+        const matchedTransaction = await verifyPayment(amount, startTime, merchantId, req.headers['user-agent']);
 
         if (matchedTransaction) {
-            logActivity('SUCCESS', `Pembayaran terverifikasi lunas untuk nominal Rp ${targetAmount}`, matchedTransaction);
+            logActivity('SUCCESS', `Pembayaran terverifikasi lunas untuk nominal Rp ${parseInt(amount, 10)}`, matchedTransaction);
             return res.json({
                 success: true,
                 paid: true,
@@ -397,7 +684,6 @@ app.all('/check-payment', apiKeyAuth, async (req, res) => {
                 message: 'Pembayaran belum ditemukan atau sudah pernah diklaim'
             });
         }
-
     } catch (err) {
         const errorDetail = err.response ? `HTTP ${err.response.status}: ${JSON.stringify(err.response.data)}` : err.message;
         logActivity('ERROR', `Gagal periksa pembayaran: ${errorDetail}`);

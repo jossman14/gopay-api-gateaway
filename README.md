@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/Express-4.x-000000?logo=express&logoColor=white" alt="Express" />
   <img src="https://img.shields.io/badge/Auth-OTP%20Based-00AED9" alt="OTP Auth" />
   <img src="https://img.shields.io/badge/QRIS-EMVCo-red" alt="QRIS" />
-  <img src="https://img.shields.io/badge/Deploy-cPanel%20%26%20VPS-orange" alt="cPanel & VPS" />
+  <img src="https://img.shields.io/badge/Deploy-VPS%20%7C%20cPanel%20%7C%20Pterodactyl-orange" alt="Deploy Options" />
 </p>
 
 <p align="center">
@@ -32,8 +32,8 @@ API Gateway self-hosted berbasis Node.js untuk otomatisasi cek transaksi dan cet
 > Gateway ini sekarang menggunakan sistem autentikasi **OTP Terminal** (`node login.js`). Kamu tidak perlu lagi copy-paste cookie browser atau memasukkan password. Cukup masukkan nomor HP GoBiz & kode OTP 1 kali saja — token akan tersimpan dan **otomatis di-refresh oleh server di background** setiap 6 jam tanpa perlu login ulang!
 
 > [!CAUTION]
-> 🚨 **PERSYARATAN DEPLOYMENT (VPS / cPanel Hosting)**
-> Gateway ini **dapat di-deploy di VPS maupun cPanel Hosting (Node.js Selector v18.x)** yang memiliki penyimpanan permanen 24/7.
+> 🚨 **PERSYARATAN DEPLOYMENT (VPS / cPanel / Pterodactyl Panel)**
+> Gateway ini **dapat di-deploy di VPS, cPanel Hosting, maupun Pterodactyl Panel (Node.js Egg v18.x/v20.x)** yang memiliki penyimpanan permanen 24/7.
 > **DILARANG MENGGUNAKAN HOSTING SERVERLESS GRATISAN** (seperti Render Free, Vercel, Netlify) karena container akan *sleep* dan menghapus file sesi (`.GOPAY_SESI_JANGAN_DIHAPUS.json`), yang mengakibatkan sesi hangus dan harus login OTP ulang.
 
 > [!WARNING]
@@ -46,12 +46,13 @@ API Gateway self-hosted berbasis Node.js untuk otomatisasi cek transaksi dan cet
 
 - 🔐 **Login OTP Terminal** — Login resmi via SMS/WA (`node login.js`) menggunakan nomor HP GoBiz.
 - 🔄 **Auto-Refresh Token (Set-and-Forget)** — Token diperbarui otomatis di background. Login cukup **1 kali saja**.
-- 🧾 **QRIS Dinamis (EMVCo)** — Generate QRIS nominal custom dari QRIS statis merchant secara lokal (CRC16).
+- 🧾 **QRIS Dinamis (EMVCo)** — Generate QRIS nominal custom dari QRIS statis merchant secara lokal dengan parser EMVCo presisi tinggi (CRC16).
+- 📱 **Halaman Checkout QRIS Interaktif** — UI web modern siap pakai dengan timer hitung mundur 5 menit, tombol cek manual anti-banned, & auto-polling opsional (8s).
 - ✅ **Cek Pembayaran Real-Time** — Cocokkan nominal + waktu transaksi secara otomatis, anti duplikat klaim.
 - 📋 **Riwayat Mutasi Transaksi** — Ambil daftar mutasi QRIS/GoPay/Kartu dalam rentang waktu tertentu.
 - 🌐 **Dua Cara Request (GET & POST)** — Bisa dipanggil via URL query di browser atau JSON body dari backend web store.
-- 🔒 **Proteksi API Key** — Seluruh endpoint dilindungi oleh `API_KEY` rahasia milik kamu sendiri.
-- 🐳 **Docker & PM2 Ready** — Siap di-deploy ke VPS Linux dalam hitungan menit.
+- 🔒 **Proteksi API Key & Public QR API** — Endpoint backend dilindungi `API_KEY` rahasia, serta mendukung endpoint check status public aman untuk frontend UI.
+- 🐳 **Docker, PM2 & Pterodactyl Ready** — Siap di-deploy ke VPS Linux, cPanel, atau Pterodactyl Panel dalam hitungan menit.
 
 ---
 
@@ -237,6 +238,50 @@ Bagi kamu yang menggunakan **cPanel Shared Hosting / Web Hosting** (seperti Niag
 
 ---
 
+## 🦖 Panduan Deploy ke Pterodactyl Panel (Bot / App Hosting)
+
+Bagi kamu yang menggunakan **Pterodactyl Panel** (panel hosting yang umum digunakan untuk Discord bot / server Node.js), ikuti langkah-langkah berikut:
+
+> [!IMPORTANT]
+> 💡 **TIPS LOGIN OTP UNTUK PTERODACTYL:**
+> Karena konsol web Pterodactyl terkadang kurang responsif untuk input interaktif terminal (`node login.js`), disarankan untuk **melakukan login OTP 1x di PC lokal / VPS terlebih dahulu**, kemudian mengunggah file `.GOPAY_SESI_JANGAN_DIHAPUS.json` yang dihasilkan ke File Manager Pterodactyl.
+
+### 📍 Langkah 1: Persiapkan Sesi Login (Lokal / VPS)
+1. Jalankan `npm install` dan `node login.js` di komputer lokal atau VPS kamu.
+2. Masukkan nomor HP GoBiz & kode OTP 4-digit.
+3. Setelah berhasil login, file `.GOPAY_SESI_JANGAN_DIHAPUS.json` akan otomatis dibuat.
+
+### 📍 Langkah 2: Upload Files ke Pterodactyl
+1. Buka **Pterodactyl Panel** -> Pilih Server kamu -> Masuk ke **File Manager**.
+2. Upload seluruh file project (termasuk `server.js`, `sessionManager.js`, `package.json`, dll).
+3. Upload juga file `.GOPAY_SESI_JANGAN_DIHAPUS.json` yang sudah dibuat pada Langkah 1.
+4. Buat file `.env` di File Manager Pterodactyl:
+   ```env
+   PORT=3000
+   API_KEY=API_KEY_RAHASIA_KAMU
+   QRIS_STATIC=00020101021126...
+   GOPAY_MERCHANT_ID=MERCHANT_ID_KAMU
+   ```
+   *(Pterodactyl akan menyesuaikan port secara otomatis sesuai alokasi port server kamu).*
+
+### 📍 Langkah 3: Konfigurasi Startup & Console
+1. Masuk ke menu **Startup** di Pterodactyl Panel:
+   - Set **Startup Command**: `node server.js` atau `npm start`
+   - Set **JS File / Entry File**: `server.js`
+2. Masuk ke menu **Console** Pterodactyl.
+3. Jalankan `npm install` jika package belum terinstall otomatis.
+4. Klik **Start** / **Restart** server.
+
+### 📍 Langkah 4: Cek Status Server
+Lihat log pada **Console**. Jika berhasil, akan muncul:
+```text
+[SERVER] Gateway running on port 3000
+[GOPAY-SESSION] Verification successful. Merchant name: TOKO KAMU
+```
+Kamu bisa mengakses endpoint health melalui URL server Pterodactyl kamu (misal: `http://IP_PANEL:PORT/health`).
+
+---
+
 ## 📡 API Reference
 
 Semua endpoint memerlukan autentikasi. Bisa lewat **Header** atau **Query Parameter**:
@@ -290,9 +335,25 @@ GET http://vps-ip:3000/create-qris?amount=25000&api_key=RAHASIA
 }
 ```
 
+### `GET /qr/:id` — Halaman Pembayaran QRIS Interaktif (Web UI)
+Membuka halaman HTML pembayaran QRIS yang interaktif. Dilengkapi dengan:
+- **Tombol Cek Manual ("🔄 Cek Status Pembayaran")** — *(Paling Aman / Anti-Banned)* Pengecekan 1x klik instan setelah pembeli transfer.
+- **Hitung Mundur Kedaluwarsa 5 Menit** — Countdown visual batas waktu transaksi.
+- **Checkbox Toggle Auto-Polling (Opsional)** — Off secara default untuk proteksi rate-limit. Jika dicentang pembeli, mengecek status setiap 8 detik di background.
+- Format gambar mentah bisa diakses dengan query `?format=raw` atau `?raw=1`.
+
 ---
 
-### `GET /check-payment` — Cek Pembayaran Masuk
+### `GET /api/qr-status/:id` — Status Check Public (Tanpa API Key)
+Endpoint public yang digunakan oleh halaman HTML `/qr/:id` untuk memeriksa status pembayaran tanpa perlu mengekspos `API_KEY` di browser pembeli.
+
+```http
+GET http://vps-ip:3000/api/qr-status/abc123xyz
+```
+
+---
+
+### `GET /check-payment` — Cek Pembayaran Masuk (Backend / Server-to-Server)
 Mencari transaksi yang cocok berdasarkan nominal dan timestamp. Setiap transaksi hanya bisa diklaim 1x (anti klaim ganda).
 ```http
 GET http://vps-ip:3000/check-payment?amount=25000&api_key=RAHASIA
