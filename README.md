@@ -48,7 +48,7 @@ API Gateway self-hosted berbasis Node.js untuk otomatisasi cek transaksi dan cet
 - 🔄 **Auto-Refresh Token (Set-and-Forget)** — Token diperbarui otomatis di background. Login cukup **1 kali saja**.
 - 🧾 **QRIS Dinamis (EMVCo)** — Generate QRIS nominal custom dari QRIS statis merchant secara lokal dengan parser EMVCo presisi tinggi (CRC16).
 - 📱 **Halaman Checkout QRIS Interaktif** — UI web modern siap pakai dengan timer hitung mundur 5 menit, tombol cek manual anti-banned, & auto-polling opsional (8s).
-- ✅ **Cek Pembayaran Real-Time** — Cocokkan nominal + waktu transaksi secara otomatis, anti duplikat klaim.
+- ✅ **Cek Pembayaran Real-Time** — Cocokkan nominal + waktu transaksi secara otomatis. Setiap payment memiliki `trx_id` unik sehingga **dua payment nominal sama tidak akan saling klaim** (anti duplikat klaim per TRX-ID).
 - 📋 **Riwayat Mutasi Transaksi** — Ambil daftar mutasi QRIS/GoPay/Kartu dalam rentang waktu tertentu.
 - 🌐 **Dua Cara Request (GET & POST)** — Bisa dipanggil via URL query di browser atau JSON body dari backend web store.
 - 🔒 **Proteksi API Key & Public QR API** — Endpoint backend dilindungi `API_KEY` rahasia, serta mendukung endpoint check status public aman untuk frontend UI.
@@ -326,6 +326,8 @@ GET http://vps-ip:3000/create-qris?amount=25000&api_key=RAHASIA
 {
   "success": true,
   "data": {
+    "qris_id": "abc123xyz",
+    "trx_id": "TRX-A3F8K2M9",
     "qris_url": "http://vps-ip:3000/qr/abc123xyz",
     "qris_code": "00020101021126...",
     "amount": 25000,
@@ -334,6 +336,9 @@ GET http://vps-ip:3000/create-qris?amount=25000&api_key=RAHASIA
   }
 }
 ```
+
+> [!TIP]
+> Simpan `trx_id` yang dikembalikan. Gunakan nilai ini sebagai parameter `trx_id` saat memanggil `/check-payment` agar dua payment dengan nominal sama tidak saling klaim transaksi satu sama lain.
 
 ### `GET /qr/:id` — Halaman Pembayaran QRIS Interaktif (Web UI)
 Membuka halaman HTML pembayaran QRIS yang interaktif. Dilengkapi dengan:
@@ -354,13 +359,14 @@ GET http://vps-ip:3000/api/qr-status/abc123xyz
 ---
 
 ### `GET /check-payment` — Cek Pembayaran Masuk (Backend / Server-to-Server)
-Mencari transaksi yang cocok berdasarkan nominal dan timestamp. Setiap transaksi hanya bisa diklaim 1x (anti klaim ganda).
+Mencari transaksi yang cocok berdasarkan nominal dan timestamp. Setiap transaksi hanya bisa diklaim 1x per `trx_id` (anti klaim ganda, termasuk untuk dua payment dengan nominal sama).
 ```http
-GET http://vps-ip:3000/check-payment?amount=25000&api_key=RAHASIA
+GET http://vps-ip:3000/check-payment?amount=25000&trx_id=TRX-A3F8K2M9&api_key=RAHASIA
 ```
 | Parameter | Tipe | Default | Keterangan |
 |---|---|---|---|
 | `amount` | `number` | — | Nominal transaksi yang dicari (wajib) |
+| `trx_id` | `string` | — | TRX-ID dari `/create-qris` — scope klaim agar tidak tabrakan dengan payment nominal sama (sangat direkomendasikan) |
 | `startTime` | `string` | 24 jam lalu | Timestamp ISO awal pencarian |
 | `api_key` | `string` | — | API Key kamu |
 
@@ -370,7 +376,7 @@ GET http://vps-ip:3000/check-payment?amount=25000&api_key=RAHASIA
   "success": true,
   "paid": true,
   "transaction": {
-    "transaction_id": "TRX-12345",
+    "transaction_id": "gopay-internal-tx-id",
     "order_id": "GOPAY-1234567890",
     "amount": 25000,
     "payer_issuer": "GoPay / BCA",
