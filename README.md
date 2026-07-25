@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/Express-4.x-000000?logo=express&logoColor=white" alt="Express" />
   <img src="https://img.shields.io/badge/Auth-OTP%20Based-00AED9" alt="OTP Auth" />
   <img src="https://img.shields.io/badge/QRIS-EMVCo-red" alt="QRIS" />
-  <img src="https://img.shields.io/badge/Deploy-cPanel%20%26%20VPS-orange" alt="cPanel & VPS" />
+  <img src="https://img.shields.io/badge/Deploy-VPS%20%7C%20cPanel%20%7C%20Pterodactyl-orange" alt="Deploy Options" />
 </p>
 
 <p align="center">
@@ -32,8 +32,8 @@ API Gateway self-hosted berbasis Node.js untuk otomatisasi cek transaksi dan cet
 > Gateway ini sekarang menggunakan sistem autentikasi **OTP Terminal** (`node login.js`). Kamu tidak perlu lagi copy-paste cookie browser atau memasukkan password. Cukup masukkan nomor HP GoBiz & kode OTP 1 kali saja — token akan tersimpan dan **otomatis di-refresh oleh server di background** setiap 6 jam tanpa perlu login ulang!
 
 > [!CAUTION]
-> 🚨 **PERSYARATAN DEPLOYMENT (VPS / cPanel Hosting)**
-> Gateway ini **dapat di-deploy di VPS maupun cPanel Hosting (Node.js Selector v18.x)** yang memiliki penyimpanan permanen 24/7.
+> 🚨 **PERSYARATAN DEPLOYMENT (VPS / cPanel / Pterodactyl Panel)**
+> Gateway ini **dapat di-deploy di VPS, cPanel Hosting, maupun Pterodactyl Panel (Node.js Egg v18.x/v20.x)** yang memiliki penyimpanan permanen 24/7.
 > **DILARANG MENGGUNAKAN HOSTING SERVERLESS GRATISAN** (seperti Render Free, Vercel, Netlify) karena container akan *sleep* dan menghapus file sesi (`.GOPAY_SESI_JANGAN_DIHAPUS.json`), yang mengakibatkan sesi hangus dan harus login OTP ulang.
 
 > [!WARNING]
@@ -51,7 +51,7 @@ API Gateway self-hosted berbasis Node.js untuk otomatisasi cek transaksi dan cet
 - 📋 **Riwayat Mutasi Transaksi** — Ambil daftar mutasi QRIS/GoPay/Kartu dalam rentang waktu tertentu.
 - 🌐 **Dua Cara Request (GET & POST)** — Bisa dipanggil via URL query di browser atau JSON body dari backend web store.
 - 🔒 **Proteksi API Key** — Seluruh endpoint dilindungi oleh `API_KEY` rahasia milik kamu sendiri.
-- 🐳 **Docker & PM2 Ready** — Siap di-deploy ke VPS Linux dalam hitungan menit.
+- 🐳 **Docker, PM2 & Pterodactyl Ready** — Siap di-deploy ke VPS Linux, cPanel, atau Pterodactyl Panel dalam hitungan menit.
 
 ---
 
@@ -234,6 +234,50 @@ Bagi kamu yang menggunakan **cPanel Shared Hosting / Web Hosting** (seperti Niag
 
 4. Kembali ke menu **Setup Node.js App** di cPanel, lalu klik tombol **Restart**.
 5. Cek aplikasi di browser: `https://gopay.domainkamu.com/health`.
+
+---
+
+## 🦖 Panduan Deploy ke Pterodactyl Panel (Bot / App Hosting)
+
+Bagi kamu yang menggunakan **Pterodactyl Panel** (panel hosting yang umum digunakan untuk Discord bot / server Node.js), ikuti langkah-langkah berikut:
+
+> [!IMPORTANT]
+> 💡 **TIPS LOGIN OTP UNTUK PTERODACTYL:**
+> Karena konsol web Pterodactyl terkadang kurang responsif untuk input interaktif terminal (`node login.js`), disarankan untuk **melakukan login OTP 1x di PC lokal / VPS terlebih dahulu**, kemudian mengunggah file `.GOPAY_SESI_JANGAN_DIHAPUS.json` yang dihasilkan ke File Manager Pterodactyl.
+
+### 📍 Langkah 1: Persiapkan Sesi Login (Lokal / VPS)
+1. Jalankan `npm install` dan `node login.js` di komputer lokal atau VPS kamu.
+2. Masukkan nomor HP GoBiz & kode OTP 4-digit.
+3. Setelah berhasil login, file `.GOPAY_SESI_JANGAN_DIHAPUS.json` akan otomatis dibuat.
+
+### 📍 Langkah 2: Upload Files ke Pterodactyl
+1. Buka **Pterodactyl Panel** -> Pilih Server kamu -> Masuk ke **File Manager**.
+2. Upload seluruh file project (termasuk `server.js`, `sessionManager.js`, `package.json`, dll).
+3. Upload juga file `.GOPAY_SESI_JANGAN_DIHAPUS.json` yang sudah dibuat pada Langkah 1.
+4. Buat file `.env` di File Manager Pterodactyl:
+   ```env
+   PORT=3000
+   API_KEY=API_KEY_RAHASIA_KAMU
+   QRIS_STATIC=00020101021126...
+   GOPAY_MERCHANT_ID=MERCHANT_ID_KAMU
+   ```
+   *(Pterodactyl akan menyesuaikan port secara otomatis sesuai alokasi port server kamu).*
+
+### 📍 Langkah 3: Konfigurasi Startup & Console
+1. Masuk ke menu **Startup** di Pterodactyl Panel:
+   - Set **Startup Command**: `node server.js` atau `npm start`
+   - Set **JS File / Entry File**: `server.js`
+2. Masuk ke menu **Console** Pterodactyl.
+3. Jalankan `npm install` jika package belum terinstall otomatis.
+4. Klik **Start** / **Restart** server.
+
+### 📍 Langkah 4: Cek Status Server
+Lihat log pada **Console**. Jika berhasil, akan muncul:
+```text
+[SERVER] Gateway running on port 3000
+[GOPAY-SESSION] Verification successful. Merchant name: TOKO KAMU
+```
+Kamu bisa mengakses endpoint health melalui URL server Pterodactyl kamu (misal: `http://IP_PANEL:PORT/health`).
 
 ---
 
