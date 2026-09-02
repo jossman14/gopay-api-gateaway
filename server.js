@@ -5,12 +5,25 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 const sessionManager = require('./sessionManager');
+const PaymentStore = require('./lib/paymentStore');
+const { generateDynamicQRIS } = require('./lib/qris');
+const { deliverWebhook } = require('./lib/webhook');
+const { listenWithFallback } = require('./lib/serverListener');
+const { AdminAuth } = require('./lib/adminAuth');
+const { rawProviderAmount, providerAmountCandidates } = require('./lib/providerAmount');
+const QRCode = require('qrcode');
 
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
+const AUTO_PORT = String(process.env.AUTO_PORT || 'true').toLowerCase() !== 'false';
+const MAX_PORT_ATTEMPTS = Math.max(1, parseInt(process.env.MAX_PORT_ATTEMPTS || '20', 10));
 const MAX_LOGS = 100;
 const CLAIMED_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 jam
 const QRIS_EXPIRY_MS = 5 * 60 * 1000; // 5 menit
 const GOJEK_TRANSACTIONS_URL = 'https://api.gojekapi.com/merchant-analytics/v2/merchants/transactions';
+const PAYMENT_EXPIRY_MS = Math.max(60, parseInt(process.env.PAYMENT_EXPIRY_MINUTES || '15', 10)) * 60 * 1000;
+const RECONCILE_INTERVAL_MS = Math.max(10, parseInt(process.env.RECONCILE_INTERVAL_SECONDS || '20', 10)) * 1000;
+const PAYMENT_STORE_FILE = path.resolve(__dirname, process.env.PAYMENT_STORE_FILE || 'data/payments.json');
+const PUBLIC_DIR = path.join(__dirname, 'public');
 
 
 // claimedTransactions: Map<txId, { qrisId: string|null, claimedAt: number }>
@@ -18,6 +31,21 @@ const GOJEK_TRANSACTIONS_URL = 'https://api.gojekapi.com/merchant-analytics/v2/m
 const claimedTransactions = new Map();
 const activityLogs = [];
 const qrisStore = new Map();
+const paymentStore = new PaymentStore(PAYMENT_STORE_FILE);
+const adminAuth = new AdminAuth({
+    email: process.env.ADMIN_EMAIL || 'admin@hehe.com',
+    password: process.env.ADMIN_PASSWORD || 'admin@hehe.com',
+    secureCookie: String(process.env.ADMIN_SECURE_COOKIE || 'false').toLowerCase() === 'true'
+});
+let activePort = null;
+const reconciliationStatus = {
+    running: false,
+    last_started_at: null,
+    last_success_at: null,
+    last_error: null,
+    transactions_seen: 0
+};
+let providerTransactionCache = [];
 
 const CACHE_FILE = path.join(__dirname, '.gopay_cache.json');
 
@@ -68,84 +96,6 @@ async function autoRefreshSessionPeriodically() {
 }
 setInterval(autoRefreshSessionPeriodically, 6 * 60 * 60 * 1000);
 
-// Hitung Checksum CRC16 EMVCo untuk QRIS
-function calculateCRC16(payload) {
-    let crc = 0xFFFF;
-    for (let i = 0; i < payload.length; i++) {
-        crc ^= payload.charCodeAt(i) << 8;
-        for (let j = 0; j < 8; j++) {
-            if ((crc & 0x8000) !== 0) {
-                crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
-            } else {
-                crc = (crc << 1) & 0xFFFF;
-            }
-        }
-    }
-    return crc.toString(16).toUpperCase().padStart(4, '0');
-}
-
-// Generate QRIS Dinamis Standar EMVCo (Parsing TLV Presisi Tinggi)
-function generateDynamicQRIS(staticTemplate, amount) {
-    if (!staticTemplate) return null;
-    let payload = staticTemplate.trim();
-
-    // Hapus Tag 63 (CRC) lama jika ada di akhir
-    const idx63 = payload.indexOf('6304');
-    if (idx63 !== -1) {
-        payload = payload.substring(0, idx63);
-    }
-
-    // Parse EMVCo TLV Tags
-    const tags = [];
-    let i = 0;
-    try {
-        while (i < payload.length) {
-            const tag = payload.substring(i, i + 2);
-            const length = parseInt(payload.substring(i + 2, i + 4), 10);
-            if (isNaN(length)) break;
-            const val = payload.substring(i + 4, i + 4 + length);
-            tags.push({ tag, val });
-            i += 4 + length;
-        }
-    } catch (e) {
-        return null;
-    }
-
-    const amountStr = parseInt(amount, 10).toString();
-    const newTags = [];
-    let hasTag54 = false;
-
-    for (const item of tags) {
-        if (item.tag === '01') {
-            // Ubah Static (11) ke Dynamic (12)
-            newTags.push({ tag: '01', val: '12' });
-        } else if (item.tag === '54') {
-            newTags.push({ tag: '54', val: amountStr });
-            hasTag54 = true;
-        } else if (item.tag === '58' && !hasTag54) {
-            newTags.push({ tag: '54', val: amountStr });
-            hasTag54 = true;
-            newTags.push(item);
-        } else {
-            newTags.push(item);
-        }
-    }
-
-    if (!hasTag54) {
-        newTags.push({ tag: '54', val: amountStr });
-    }
-
-    let result = '';
-    for (const item of newTags) {
-        const lenStr = item.val.length.toString().padStart(2, '0');
-        result += `${item.tag}${lenStr}${item.val}`;
-    }
-
-    result += '6304';
-    const checksum = calculateCRC16(result);
-    return result + checksum;
-}
-
 // Middleware Proteksi API Key
 const apiKeyAuth = (req, res, next) => {
     const apiKey = req.headers['x-api-key'] || req.query.api_key || req.query.apikey;
@@ -158,6 +108,58 @@ const apiKeyAuth = (req, res, next) => {
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+app.use('/admin', (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Content-Security-Policy', "default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+    next();
+});
+app.use('/admin/assets', (req, res, next) => {
+    if (req.path.toLowerCase().endsWith('.html')) return res.status(404).end();
+    next();
+}, express.static(PUBLIC_DIR, { fallthrough: false, maxAge: 0 }));
+
+app.get('/admin/login', (req, res) => {
+    if (adminAuth.sessionFromRequest(req)) return res.redirect('/admin');
+    return res.sendFile(path.join(PUBLIC_DIR, 'login.html'));
+});
+
+app.post('/admin/api/login', (req, res) => {
+    const result = adminAuth.login(req.body?.email, req.body?.password, req.ip || req.socket.remoteAddress);
+    if (!result.ok) return res.status(result.status).json({ success: false, message: result.message });
+    res.setHeader('Set-Cookie', adminAuth.cookie(result.token));
+    return res.json({ success: true, data: { email: result.session.email, csrf_token: result.session.csrfToken } });
+});
+
+app.get('/admin', (req, res) => {
+    if (!adminAuth.sessionFromRequest(req)) return res.redirect('/admin/login');
+    return res.sendFile(path.join(PUBLIC_DIR, 'dashboard.html'));
+});
+
+app.get('/admin/api/session', adminAuth.requireSession.bind(adminAuth), (req, res) => {
+    return res.json({
+        success: true,
+        data: {
+            email: req.adminSession.email,
+            csrf_token: req.adminSession.csrfToken,
+            expires_at: new Date(req.adminSession.expiresAt).toISOString()
+        }
+    });
+});
+
+app.post(
+    '/admin/api/logout',
+    adminAuth.requireSession.bind(adminAuth),
+    adminAuth.requireCsrf.bind(adminAuth),
+    (req, res) => {
+        adminAuth.logout(req);
+        res.setHeader('Set-Cookie', adminAuth.clearCookie());
+        return res.json({ success: true });
+    }
+);
 
 app.get('/', (req, res) => {
     res.send('GoPay Partner API Gateway Berjalan');
@@ -249,6 +251,117 @@ app.all('/create-qris', apiKeyAuth, (req, res) => {
             expires_in: '5 menit'
         }
     });
+});
+
+function paymentResponse(payment) {
+    return {
+        id: payment.id,
+        order_id: payment.order_id,
+        merchant_reference: payment.merchant_reference,
+        base_amount: payment.base_amount,
+        unique_code: payment.unique_code,
+        amount: payment.payable_amount,
+        status: payment.status,
+        qris_code: payment.qris_payload,
+        created_at: payment.created_at,
+        expires_at: payment.expires_at,
+        paid_at: payment.paid_at,
+        transaction_id: payment.provider_transaction_id,
+        webhook_status: payment.webhook?.status || 'NOT_SENT'
+    };
+}
+
+function paymentError(status, message) {
+    const error = new Error(message);
+    error.status = status;
+    return error;
+}
+
+function createPayment(input) {
+    const orderId = String(input?.order_id || '').trim();
+    const amount = Number(input?.amount);
+    const callbackUrl = input?.callback_url ? String(input.callback_url) : null;
+
+    if (!/^[A-Za-z0-9._-]{1,100}$/.test(orderId)) {
+        throw paymentError(400, 'order_id harus 1-100 karakter ASCII yang aman');
+    }
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+        throw paymentError(400, 'amount harus berupa bilangan bulat positif');
+    }
+    if (callbackUrl) {
+        let parsed;
+        try {
+            parsed = new URL(callbackUrl);
+        } catch (_) {
+            throw paymentError(400, 'callback_url harus berupa URL HTTP/HTTPS yang valid');
+        }
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+            throw paymentError(400, 'callback_url harus berupa URL HTTP/HTTPS yang valid');
+        }
+        const allowedHosts = String(process.env.WEBHOOK_ALLOWED_HOSTS || '')
+            .split(',').map(host => host.trim().toLowerCase()).filter(Boolean);
+        if (allowedHosts.length && !allowedHosts.includes(parsed.hostname.toLowerCase())) {
+            throw paymentError(400, 'Host callback_url tidak ada di WEBHOOK_ALLOWED_HOSTS');
+        }
+    }
+    if (!process.env.QRIS_STATIC) throw paymentError(500, 'QRIS_STATIC belum dikonfigurasi di .env');
+
+    let result = null;
+    try {
+        result = paymentStore.create({
+            order_id: orderId,
+            base_amount: amount,
+            callback_url: callbackUrl,
+            expiry_ms: PAYMENT_EXPIRY_MS,
+            use_unique_amount: String(process.env.USE_UNIQUE_AMOUNT || 'true').toLowerCase() !== 'false',
+            unique_min: Math.max(1, parseInt(process.env.UNIQUE_AMOUNT_MIN || '1', 10)),
+            unique_max: Math.min(999, parseInt(process.env.UNIQUE_AMOUNT_MAX || '999', 10))
+        });
+        let payment = result.payment;
+        if (result.created) {
+            const qrisPayload = generateDynamicQRIS(process.env.QRIS_STATIC, payment.payable_amount, payment.merchant_reference);
+            payment = paymentStore.update(payment.id, { qris_payload: qrisPayload });
+            logActivity('INFO', `Invoice ${payment.id} dibuat untuk order ${orderId}, nominal Rp ${payment.payable_amount}`);
+        }
+        return { payment, created: result.created };
+    } catch (error) {
+        if (result?.created && !result.payment.qris_payload) paymentStore.remove(result.payment.id);
+        if (!error.status) error.status = 409;
+        throw error;
+    }
+}
+
+// API invoice persisten. order_id bersifat idempotent: request ulang mengembalikan invoice yang sama.
+app.post('/api/v1/payments', apiKeyAuth, (req, res) => {
+    try {
+        const result = createPayment(req.body);
+        return res.status(result.created ? 201 : 200).json({
+            success: true,
+            idempotent_replay: !result.created,
+            data: paymentResponse(result.payment)
+        });
+    } catch (err) {
+        logActivity('ERROR', `Gagal membuat invoice: ${err.message}`);
+        return res.status(err.status || 500).json({ success: false, message: err.message });
+    }
+});
+
+app.get('/api/v1/payments/:id', apiKeyAuth, (req, res) => {
+    paymentStore.pending();
+    const payment = paymentStore.get(req.params.id);
+    if (!payment) return res.status(404).json({ success: false, message: 'Payment tidak ditemukan' });
+    return res.json({ success: true, data: paymentResponse(payment) });
+});
+
+app.get('/api/v1/payments', apiKeyAuth, (req, res) => {
+    paymentStore.pending();
+    const status = req.query.status ? String(req.query.status).toUpperCase() : null;
+    const payments = paymentStore.list()
+        .filter(payment => !status || payment.status === status)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .slice(0, Math.min(100, Math.max(1, parseInt(req.query.limit || '20', 10))))
+        .map(paymentResponse);
+    return res.json({ success: true, data: payments });
 });
 
 // Render Halaman HTML QRIS Interaktif (Tombol Cek Manual + Auto Polling Toggle)
@@ -613,11 +726,12 @@ async function verifyPayment(amount, startTime, merchantIdOverride = null, userA
     const filterStartTimeMs = startTime ? new Date(startTime).getTime() : 0;
 
     for (const tx of rawTransactions) {
-        const txAmount = parseInt(tx.gross_amount || tx.real_gross_amount || tx.amount?.value || tx.amount || 0, 10);
+        const amountCandidates = providerAmountCandidates(tx);
+        const txAmount = amountCandidates.find(candidate => candidate === targetAmount);
         const txTimestamp = new Date(tx.transaction_time || tx.created_at || tx.settlement_time || 0).getTime();
         const txId = tx.id || tx.order_id || tx.wallstreet_transaction_id;
 
-        if (txAmount === targetAmount && txTimestamp >= filterStartTimeMs) {
+        if (txAmount !== undefined && txTimestamp >= filterStartTimeMs) {
             const existingClaim = claimedTransactions.get(txId);
 
             if (!existingClaim) {
@@ -651,6 +765,309 @@ async function verifyPayment(amount, startTime, merchantIdOverride = null, userA
     }
     return null;
 }
+
+async function fetchMerchantTransactions(startTime) {
+    let headers = await sessionManager.getValidHeaders('gopay-merchant-gateway-worker/2.0');
+    if (!headers) throw new Error('Sesi GoPay belum tersedia');
+
+    const request = activeHeaders => axios.get(GOJEK_TRANSACTIONS_URL, {
+        headers: activeHeaders,
+        params: {
+            from: 0,
+            size: 100,
+            statuses: 'SETTLEMENT,CAPTURE',
+            payment_types: 'QRIS,GOPAY',
+            start_time: new Date(startTime).toISOString(),
+            end_time: new Date().toISOString(),
+            merchant_ids: process.env.GOPAY_MERCHANT_ID || ''
+        },
+        timeout: 10000
+    });
+
+    try {
+        const response = await request(headers);
+        return response.data?.transactions || response.data?.data?.transactions || response.data?.data || [];
+    } catch (err) {
+        if (err.response?.status !== 401) throw err;
+        const refreshed = await sessionManager.refreshSession();
+        if (!refreshed) throw err;
+        headers = await sessionManager.getValidHeaders('gopay-merchant-gateway-worker/2.0');
+        const response = await request(headers);
+        return response.data?.transactions || response.data?.data?.transactions || response.data?.data || [];
+    }
+}
+
+function normalizeTransaction(tx) {
+    const referenceKeys = new Set([
+        'reference_label', 'reference', 'bill_number', 'customer_reference',
+        'merchant_reference', 'terminal_label'
+    ]);
+    const references = [];
+    const visit = (value, depth = 0) => {
+        if (!value || typeof value !== 'object' || depth > 3) return;
+        for (const [key, nested] of Object.entries(value)) {
+            if (referenceKeys.has(key) && ['string', 'number'].includes(typeof nested)) {
+                references.push(String(nested));
+            } else if (typeof nested === 'object') {
+                visit(nested, depth + 1);
+            }
+        }
+    };
+    visit(tx);
+
+    return {
+        transaction_id: String(tx.id || tx.wallstreet_transaction_id || tx.order_id || ''),
+        order_id: tx.order_id || null,
+        amount: rawProviderAmount(tx),
+        amount_candidates: providerAmountCandidates(tx),
+        transaction_time: tx.transaction_time || tx.settlement_time || tx.created_at || null,
+        payer_issuer: tx.qris_provider_aspi_issuer || 'GoPay / Bank',
+        payment_type: tx.payment_type || tx.transaction_source || 'QRIS',
+        references,
+        raw: tx
+    };
+}
+
+function providerTransactionResponse(transaction) {
+    const linkedPayment = paymentStore.list().find(payment =>
+        payment.provider_transaction_id === transaction.transaction_id
+    );
+    const { raw, amount_candidates, ...safeTransaction } = transaction;
+    if (!linkedPayment) return safeTransaction;
+
+    return {
+        ...safeTransaction,
+        amount: linkedPayment.payable_amount,
+        amount_normalized: linkedPayment.payable_amount !== transaction.amount
+    };
+}
+
+let reconciliationRunning = false;
+async function processWebhookQueue() {
+    const candidates = paymentStore.list().filter(payment =>
+        payment.status === 'PAID' &&
+        payment.callback_url &&
+        payment.webhook?.status !== 'DELIVERED' &&
+        (payment.webhook?.attempts || 0) < 5
+    );
+
+    for (const payment of candidates) {
+        const attempts = (payment.webhook?.attempts || 0) + 1;
+        try {
+            const result = await deliverWebhook(payment, process.env.WEBHOOK_SECRET);
+            paymentStore.update(payment.id, { webhook: { status: result.status, attempts, last_error: null } });
+            logActivity('SUCCESS', `Webhook payment ${payment.id} terkirim`);
+        } catch (err) {
+            paymentStore.update(payment.id, { webhook: { status: 'FAILED', attempts, last_error: err.message } });
+            logActivity('WARNING', `Webhook payment ${payment.id} gagal (percobaan ${attempts}): ${err.message}`);
+        }
+    }
+}
+
+async function reconcilePayments() {
+    if (reconciliationRunning) return;
+    reconciliationRunning = true;
+    reconciliationStatus.running = true;
+    reconciliationStatus.last_started_at = new Date().toISOString();
+    try {
+        const pending = paymentStore.pending();
+        if (pending.length) {
+            const earliest = Math.min(...pending.map(payment => Date.parse(payment.created_at)));
+            const rawTransactions = await fetchMerchantTransactions(earliest);
+            const transactions = (Array.isArray(rawTransactions) ? rawTransactions : []).map(normalizeTransaction);
+            reconciliationStatus.transactions_seen = transactions.length;
+
+            // Prioritaskan nilai provider mentah. Fallback ÷100 hanya dipakai bila
+            // endpoint Merchant Analytics mengembalikan IDR dalam minor unit.
+            const matchPasses = [
+                transaction => [transaction.amount],
+                transaction => transaction.amount_candidates.filter(amount => amount !== transaction.amount)
+            ];
+
+            for (const amountCandidates of matchPasses) {
+              for (const transaction of transactions) {
+                if (!transaction.transaction_id || !transaction.amount) continue;
+                const txTime = Date.parse(transaction.transaction_time || 0);
+                const candidates = amountCandidates(transaction);
+                if (!candidates.length) continue;
+                const referenceMatch = pending.find(payment =>
+                    candidates.includes(payment.payable_amount) &&
+                    transaction.references.includes(payment.merchant_reference) &&
+                    txTime >= Date.parse(payment.created_at)
+                );
+                const amountMatch = pending.find(payment =>
+                    candidates.includes(payment.payable_amount) &&
+                    txTime >= Date.parse(payment.created_at)
+                );
+                const payment = referenceMatch || amountMatch;
+                if (!payment) continue;
+
+                const matchedAmount = payment.payable_amount;
+                const providerRawAmount = transaction.amount;
+
+                const paid = paymentStore.markPaid(payment.id, {
+                    transaction_id: transaction.transaction_id,
+                    order_id: transaction.order_id,
+                    amount: matchedAmount,
+                    provider_raw_amount: providerRawAmount,
+                    transaction_time: transaction.transaction_time,
+                    payer_issuer: transaction.payer_issuer,
+                    payment_type: transaction.payment_type,
+                    matched_by: referenceMatch
+                        ? 'QRIS_REFERENCE_AND_AMOUNT'
+                        : (matchedAmount === transaction.amount ? 'UNIQUE_AMOUNT' : 'UNIQUE_AMOUNT_MINOR_UNIT')
+                });
+                if (paid) {
+                    transaction.amount = matchedAmount;
+                    transaction.amount_normalized = matchedAmount !== providerRawAmount;
+                    logActivity('SUCCESS', `Payment ${paid.id} PAID oleh transaksi ${transaction.transaction_id}`);
+                }
+              }
+            }
+            providerTransactionCache = transactions.slice(0, 100).map(providerTransactionResponse);
+        }
+        await processWebhookQueue();
+        reconciliationStatus.last_success_at = new Date().toISOString();
+        reconciliationStatus.last_error = null;
+    } catch (err) {
+        reconciliationStatus.last_error = err.message;
+        // Tidak adanya sesi saat belum ada invoice bukan error operasional. Error worker tetap dicatat saat ada pekerjaan.
+        if (paymentStore.pending().length) logActivity('WARNING', `Worker rekonsiliasi: ${err.message}`);
+    } finally {
+        reconciliationRunning = false;
+        reconciliationStatus.running = false;
+    }
+}
+
+app.get('/api/v1/debug/transactions/raw', apiKeyAuth, async (req, res) => {
+    if (String(process.env.ENABLE_RAW_TRANSACTION_DEBUG || 'false').toLowerCase() !== 'true') {
+        return res.status(404).json({ success: false, message: 'Raw transaction debug dinonaktifkan' });
+    }
+    try {
+        const hours = Math.min(72, Math.max(1, parseInt(req.query.hours || '24', 10)));
+        const raw = await fetchMerchantTransactions(Date.now() - hours * 60 * 60 * 1000);
+        return res.json({ success: true, warning: 'Data ini dapat mengandung informasi sensitif. Jangan dipublikasikan.', data: raw });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+const requireAdmin = adminAuth.requireSession.bind(adminAuth);
+const requireAdminCsrf = adminAuth.requireCsrf.bind(adminAuth);
+
+function adminPaymentResponse(payment) {
+    return {
+        ...paymentResponse(payment),
+        qr_image_url: `/admin/api/payments/${encodeURIComponent(payment.id)}/qr`
+    };
+}
+
+function paymentCounts() {
+    const counts = { total: 0, pending: 0, paid: 0, expired: 0 };
+    for (const payment of paymentStore.list()) {
+        counts.total += 1;
+        const key = String(payment.status || '').toLowerCase();
+        if (Object.prototype.hasOwnProperty.call(counts, key)) counts[key] += 1;
+    }
+    return counts;
+}
+
+app.get('/admin/api/monitor', requireAdmin, (req, res) => {
+    paymentStore.pending();
+    const merchantSession = sessionManager.loadSession();
+    const memory = process.memoryUsage();
+    return res.json({
+        success: true,
+        data: {
+            service: {
+                status: 'ONLINE',
+                port: activePort,
+                uptime_seconds: Math.floor(process.uptime()),
+                node_version: process.version,
+                memory_rss_mb: Math.round(memory.rss / 1024 / 1024),
+                started_at: new Date(Date.now() - process.uptime() * 1000).toISOString()
+            },
+            merchant: {
+                session_configured: Boolean(merchantSession?.access_token),
+                merchant_id: merchantSession?.merchant_id || process.env.GOPAY_MERCHANT_ID || null,
+                outlet_name: merchantSession?.outlet_name || null,
+                token_expires_at: merchantSession?.expires_at || null,
+                token_expired: merchantSession ? sessionManager.isExpired(merchantSession) : true
+            },
+            worker: { ...reconciliationStatus, interval_seconds: RECONCILE_INTERVAL_MS / 1000 },
+            payments: paymentCounts(),
+            provider_transactions: providerTransactionCache,
+            activity: activityLogs.slice(0, 30).map(({ id, timestamp, type, message }) => ({ id, timestamp, type, message }))
+        }
+    });
+});
+
+app.post('/admin/api/monitor/sync', requireAdmin, requireAdminCsrf, async (req, res) => {
+    try {
+        const raw = await fetchMerchantTransactions(Date.now() - 24 * 60 * 60 * 1000);
+        providerTransactionCache = (Array.isArray(raw) ? raw : [])
+            .map(normalizeTransaction)
+            .map(providerTransactionResponse)
+            .slice(0, 100);
+        reconciliationStatus.last_success_at = new Date().toISOString();
+        reconciliationStatus.last_error = null;
+        reconciliationStatus.transactions_seen = providerTransactionCache.length;
+        await reconcilePayments();
+        return res.json({ success: true, data: { transactions: providerTransactionCache } });
+    } catch (error) {
+        reconciliationStatus.last_error = error.message;
+        return res.status(502).json({ success: false, message: `Sinkronisasi GoPay gagal: ${error.message}` });
+    }
+});
+
+app.get('/admin/api/payments', requireAdmin, (req, res) => {
+    paymentStore.pending();
+    const payments = paymentStore.list()
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .slice(0, 100)
+        .map(adminPaymentResponse);
+    return res.json({ success: true, data: payments });
+});
+
+app.post('/admin/api/payments', requireAdmin, requireAdminCsrf, (req, res) => {
+    try {
+        const result = createPayment(req.body);
+        return res.status(result.created ? 201 : 200).json({
+            success: true,
+            idempotent_replay: !result.created,
+            data: adminPaymentResponse(result.payment)
+        });
+    } catch (error) {
+        logActivity('ERROR', `Admin gagal membuat invoice: ${error.message}`);
+        return res.status(error.status || 500).json({ success: false, message: error.message });
+    }
+});
+
+app.get('/admin/api/payments/:id', requireAdmin, (req, res) => {
+    paymentStore.pending();
+    const payment = paymentStore.get(req.params.id);
+    if (!payment) return res.status(404).json({ success: false, message: 'Payment tidak ditemukan' });
+    return res.json({ success: true, data: adminPaymentResponse(payment) });
+});
+
+app.get('/admin/api/payments/:id/qr', requireAdmin, async (req, res) => {
+    const payment = paymentStore.get(req.params.id);
+    if (!payment?.qris_payload) return res.status(404).json({ success: false, message: 'QRIS payment tidak ditemukan' });
+    try {
+        const image = await QRCode.toBuffer(payment.qris_payload, {
+            type: 'png',
+            width: 420,
+            margin: 2,
+            errorCorrectionLevel: 'M',
+            color: { dark: '#151919', light: '#F8FAF8' }
+        });
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Content-Length', image.length);
+        return res.end(image);
+    } catch (error) {
+        return res.status(500).json({ success: false, message: `QR gagal dibuat: ${error.message}` });
+    }
+});
 
 // Endpoint Public Check Status QRIS (Dipanggil oleh Halaman Frontend HTML QRIS tanpa butuh API Key)
 app.get('/api/qr-status/:id', async (req, res) => {
@@ -731,6 +1148,29 @@ app.get('/api/logs', apiKeyAuth, (req, res) => {
     res.json({ success: true, logs: activityLogs });
 });
 
-app.listen(PORT, () => {
-    logActivity('SYSTEM', `GoPay Partner Gateway berjalan pada port ${PORT}`);
-});
+async function startGateway() {
+    try {
+        const result = await listenWithFallback(app, {
+            preferredPort: PORT,
+            autoPort: AUTO_PORT,
+            maxAttempts: MAX_PORT_ATTEMPTS,
+            onRetry: (occupiedPort, nextPort) => {
+                logActivity('WARNING', `Port ${occupiedPort} sedang dipakai, mencoba port ${nextPort}...`);
+            }
+        });
+        activePort = result.port;
+        logActivity('SYSTEM', `GoPay Partner Gateway berjalan pada http://localhost:${result.port}`);
+        logActivity('SYSTEM', `Dashboard admin tersedia di http://localhost:${result.port}/admin`);
+        if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
+            logActivity('WARNING', 'Dashboard memakai kredensial admin default. Ganti ADMIN_EMAIL dan ADMIN_PASSWORD di .env sebelum akses publik.');
+        }
+        logActivity('SYSTEM', `Worker rekonsiliasi aktif setiap ${RECONCILE_INTERVAL_MS / 1000} detik`);
+        setTimeout(reconcilePayments, 1000);
+        setInterval(reconcilePayments, RECONCILE_INTERVAL_MS);
+    } catch (error) {
+        logActivity('ERROR', `Gateway gagal dijalankan: ${error.message}`);
+        process.exitCode = 1;
+    }
+}
+
+startGateway();

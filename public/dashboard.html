@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Gateway Operations · GoPay</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;700&family=IBM+Plex+Mono:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/assets/dashboard.css">
+  <script src="/admin/assets/dashboard.js" defer></script>
+</head>
+<body>
+  <header class="nav-edge">
+    <p class="wordmark">GOPAY / OPS</p>
+    <div class="nav-meta">
+      <span class="admin-email" id="admin-email">Memuat sesi…</span>
+      <button class="button button--quiet" id="logout-button" type="button">Logout</button>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <nav class="section-nav" aria-label="Bagian dashboard">
+      <a href="#overview" aria-current="true">Overview</a>
+      <a href="#payment-test">Payment test</a>
+      <a href="#merchant-monitor">Monitoring</a>
+      <a href="#transactions">Transactions</a>
+      <a href="#activity">Activity</a>
+    </nav>
+
+    <div class="workspace">
+      <section class="workspace-section" id="overview">
+        <div class="overview-head">
+          <div>
+            <h1>Gateway control.</h1>
+            <p>Keadaan runtime, invoice, worker, dan sesi GoPay Merchant—tanpa mengekspos credential provider.</p>
+          </div>
+          <div class="live-state">
+            <span class="status-dot" id="service-dot"></span>
+            <span id="service-state">Membaca backend…</span>
+          </div>
+        </div>
+
+        <dl class="metric-strip" aria-label="Ringkasan gateway">
+          <div class="metric"><dt>Pending</dt><dd id="metric-pending">—</dd></div>
+          <div class="metric"><dt>Paid</dt><dd id="metric-paid">—</dd></div>
+          <div class="metric"><dt>Provider tx</dt><dd id="metric-provider">—</dd></div>
+          <div class="metric"><dt>Memory</dt><dd id="metric-memory">—</dd></div>
+        </dl>
+      </section>
+
+      <section class="workspace-section" id="payment-test">
+        <header>
+          <h2>Payment test</h2>
+          <p>Buat invoice persisten dengan nominal unik. QR dihasilkan lokal oleh gateway.</p>
+        </header>
+
+        <div class="workbench-grid">
+          <div class="workbench-panel">
+            <h3>Buat invoice</h3>
+            <form class="form-stack" id="payment-form" novalidate>
+              <div class="field" id="order-field">
+                <label for="order-id">Order ID</label>
+                <input id="order-id" name="order_id" type="text" autocomplete="off" placeholder="TEST-20260902-001" pattern="[A-Za-z0-9._-]{1,100}" aria-describedby="order-help" aria-required="true" required>
+                <p class="field-helper" id="order-help">Huruf, angka, titik, garis bawah, atau minus.</p>
+              </div>
+              <div class="field" id="amount-field">
+                <label for="amount">Nominal dasar</label>
+                <input id="amount" name="amount" type="number" inputmode="numeric" min="1" step="1" placeholder="10000" aria-describedby="amount-help" aria-required="true" required>
+                <p class="field-helper" id="amount-help">Gateway menambahkan kode unik Rp1–999.</p>
+              </div>
+              <div class="field" id="callback-field">
+                <label for="callback-url">Callback URL <span aria-hidden="true">(opsional)</span></label>
+                <input id="callback-url" name="callback_url" type="url" inputmode="url" placeholder="https://domain.com/webhook" aria-describedby="callback-help">
+                <p class="field-helper" id="callback-help">Harus cocok dengan WEBHOOK_ALLOWED_HOSTS bila allowlist aktif.</p>
+              </div>
+              <button class="button" id="create-payment-button" type="submit">Buat payment</button>
+              <p class="form-message" id="payment-message" role="status" aria-live="polite"></p>
+            </form>
+          </div>
+
+          <div class="workbench-panel payment-result" id="payment-result" aria-live="polite">
+            <div class="payment-empty">
+              <strong>Belum ada QR uji.</strong>
+              <span>Isi order dan nominal, lalu buat payment.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace-section" id="merchant-monitor">
+        <header>
+          <h2>Backend monitoring</h2>
+          <p>Runtime gateway dan sesi merchant. Sinkronisasi manual membaca transaksi 24 jam terakhir.</p>
+        </header>
+
+        <div class="monitor-grid">
+          <section class="monitor-block" aria-labelledby="runtime-title">
+            <header>
+              <h3 id="runtime-title">Runtime & session</h3>
+              <button class="button button--quiet" id="sync-button" type="button">Sync GoPay</button>
+            </header>
+            <dl class="detail-list" id="runtime-details">
+              <div><dt>Status</dt><dd>Memuat…</dd></div>
+            </dl>
+          </section>
+
+          <section class="monitor-block" aria-labelledby="provider-title">
+            <header><h3 id="provider-title">Provider transactions</h3></header>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Time</th><th>Transaction</th><th>Issuer</th><th class="numeric">Amount</th></tr></thead>
+                <tbody id="provider-table"><tr><td colspan="4" class="empty-row">Belum ada data sinkronisasi.</td></tr></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="workspace-section" id="transactions">
+        <header>
+          <h2>Gateway payments</h2>
+          <p>Invoice tersimpan lokal dan hasil rekonsiliasi provider.</p>
+        </header>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Created</th><th>Order</th><th>Status</th><th class="numeric">Base</th><th class="numeric">Payable</th><th>Match</th></tr></thead>
+            <tbody id="payments-table"><tr><td colspan="6" class="empty-row">Memuat payment…</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="workspace-section" id="activity">
+        <header>
+          <h2>Activity</h2>
+          <p>Log operasional terbaru dari proses gateway.</p>
+        </header>
+        <ol class="activity-list" id="activity-list"><li><span class="activity-time">—</span><span>Memuat activity…</span></li></ol>
+      </section>
+    </div>
+  </main>
+
+  <footer class="foot-line">GoPay Merchant Gateway · admin-only operations · data lokal satu instance</footer>
+  <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>

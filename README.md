@@ -284,6 +284,8 @@ Kamu bisa mengakses endpoint health melalui URL server Pterodactyl kamu (misal: 
 
 ## 📡 API Reference
 
+> Versi implementasi ini juga menyediakan Invoice API v1 dengan nominal unik, penyimpanan persisten, QRIS reference `62.05`, worker rekonsiliasi tunggal, dan signed webhook. Lihat [IMPLEMENTATION.md](IMPLEMENTATION.md) untuk konfigurasi dan contoh lengkap.
+
 Semua endpoint memerlukan autentikasi. Bisa lewat **Header** atau **Query Parameter**:
 
 ```text

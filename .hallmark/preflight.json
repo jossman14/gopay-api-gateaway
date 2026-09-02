@@ -1,0 +1,19 @@
+{
+  "scanned_at": "2026-09-02",
+  "framework": "Vanilla HTML served by Express",
+  "font_stack": "Plus Jakarta Sans exists only in the legacy QR payment page",
+  "palette": "Legacy inline dark slate palette; no reusable tokens",
+  "motion": "motion-cut; no animation library",
+  "spacing": "No shared spacing scale",
+  "preserve": [
+    "Express backend",
+    "existing QR payment page route",
+    "Plus Jakarta Sans compatibility"
+  ],
+  "introduce": [
+    "dashboard token system",
+    "responsive admin layout",
+    "stateful form discipline",
+    "accessible login guard"
+  ]
+}
