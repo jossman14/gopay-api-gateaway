@@ -58,15 +58,41 @@ class GopayProvider {
     };
   }
 
-  /** Mutasi merchant terbaru, dipakai worker rekonsiliasi. */
-  async listTransactions({ limit = 50 } = {}) {
+  /**
+   * Mutasi merchant terbaru, dipakai worker rekonsiliasi.
+   *
+   * Merchant Analytics menolak permintaan tanpa merchant_ids dan rentang waktu
+   * (HTTP 400). merchant_id diambil dari sesi hasil login, bukan dari
+   * environment, supaya tidak ada yang perlu diisi manual sesudah OTP.
+   */
+  async listTransactions({ limit = 50, windowHours = 24 } = {}) {
     const token = await this.session.getAccessToken();
-    const res = await this.http(`${TRANSACTIONS_URL}?limit=${limit}`, {
+    const merchantId = await this.session.merchantId();
+    if (!merchantId) {
+      throw Object.assign(
+        new Error('merchant_id belum diketahui. Ambil profil merchant dulu di konsol (menu Provider).'),
+        { statusCode: 409 }
+      );
+    }
+
+    const now = new Date();
+    const params = new URLSearchParams({
+      from: '0',
+      size: String(limit),
+      statuses: 'SETTLEMENT,CAPTURE',
+      payment_types: 'QRIS,GOPAY',
+      start_time: new Date(now.getTime() - windowHours * 3600_000).toISOString(),
+      end_time: now.toISOString(),
+      merchant_ids: merchantId,
+    });
+
+    const res = await this.http(`${TRANSACTIONS_URL}?${params}`, {
       method: 'GET',
       headers: buildHeaders(this.session.deviceId, { Authorization: `Bearer ${token}` }),
     });
     if (res.status < 200 || res.status >= 300) {
-      throw new Error(`GoPay merchant-analytics gagal (HTTP ${res.status})`);
+      const detail = res.data?.message || res.data?.error || '';
+      throw new Error(`GoPay merchant-analytics gagal (HTTP ${res.status})${detail ? ': ' + detail : ''}`);
     }
     const list = res.data?.data?.transactions ?? res.data?.transactions ?? res.data?.data ?? [];
     return (Array.isArray(list) ? list : []).map(normalizeTransaction).filter(Boolean);

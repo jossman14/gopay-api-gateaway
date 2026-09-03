@@ -151,10 +151,18 @@ class GoIdClient {
     if (res.status < 200 || res.status >= 300) {
       throw new Error(`GoID users/config gagal (HTTP ${res.status})`);
     }
+    // Bentuknya bersarang: { data: { merchant: {...}, user: {...}, features: [...] } }.
+    // Versi awal membaca dari akar sehingga selalu mengembalikan null tanpa galat.
     const payload = res.data?.data ?? res.data ?? {};
+    const m = payload.merchant ?? {};
     return {
-      merchantId: payload.merchant_id ?? payload.id ?? null,
-      outletName: payload.name ?? payload.outlet_name ?? null,
+      merchantId: m.id ?? m.tags?.merchant_id?.[0] ?? null,
+      outletName: m.outlet_name ?? null,
+      outletAddress: m.outlet_address ?? null,
+      timezone: m.timezone ?? null,
+      kycStatus: m.kyc_status ?? null,
+      // features menyebut produk yang aktif, mis. "GO-PAY STATIC QR".
+      features: (payload.features ?? []).map((f) => f.product_type).filter(Boolean),
       raw: payload,
     };
   }

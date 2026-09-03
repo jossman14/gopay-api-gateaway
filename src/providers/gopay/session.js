@@ -55,6 +55,7 @@ class SessionManager {
     this.goid = new GoIdClient({ http, deviceId });
     this._refreshing = null;
     this.lastProfileError = null;
+    this._merchantId = null;
   }
 
   async getAccessToken(now = Date.now()) {
@@ -145,7 +146,21 @@ class SessionManager {
       deviceId: this.deviceId,
     });
     this.lastProfileError = null;
+    this._merchantId = merchant.merchantId;
     return merchant;
+  }
+
+  /** merchant_id dari sesi; diambil sekali lalu di-cache. */
+  async merchantId() {
+    if (this._merchantId) return this._merchantId;
+    const s = await this.store.load(this.provider);
+    if (s?.merchant_id) return (this._merchantId = s.merchant_id);
+    // Belum tersimpan: coba ambil profilnya sekarang agar rekonsiliasi tidak
+    // menunggu operator menekan tombol.
+    try {
+      const m = await this.refreshProfile();
+      return (this._merchantId = m.merchantId);
+    } catch { return null; }
   }
 
   /** Ringkasan sesi untuk konsol. Token tidak pernah ikut. */
