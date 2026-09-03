@@ -25,11 +25,11 @@ const TRANSACTIONS_URL =
 class GopayProvider {
   static id = 'gopay';
 
-  constructor({ http, sessionStore, deviceId, qrisStatic, unique }) {
+  constructor({ http, sessionStore, deviceId, qrisStatic, unique, log = null }) {
     this.http = http;
     this.qrisStatic = qrisStatic;
     this.unique = unique;
-    this.session = new SessionManager({ store: sessionStore, http, deviceId });
+    this.session = new SessionManager({ store: sessionStore, http, deviceId, log });
   }
 
   /** Nominal unik adalah satu-satunya cara mencocokkan pembayaran di jalur ini. */

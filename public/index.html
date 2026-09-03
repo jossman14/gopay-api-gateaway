@@ -199,7 +199,9 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
       <div class="card">
         <div class="head"><div><h2>Seluruh invoice</h2>
           <p class="hint">Invoice PAID tidak dapat dihapus — itu catatan uang yang benar-benar masuk.</p></div>
-          <button class="btn sm" id="newInv">+ Invoice</button></div>
+          <div class="act">
+            <button class="ib" id="wipeTest">Hapus data uji</button>
+            <button class="btn sm" id="newInv">+ Invoice</button></div></div>
         <div id="invoices"></div>
       </div>
     </section>
@@ -220,6 +222,20 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
         <div id="providers"></div>
         <div id="provMsg" class="msg"></div>
       </div>
+      <div class="card">
+        <div class="head"><div><h2>Sesi GoPay</h2>
+          <p class="hint">Token diperbarui otomatis tiap 30 menit selama refresh token masih sah,
+            jadi tidak perlu login OTP berulang.</p></div></div>
+        <div id="sessBox"></div>
+        <div class="row">
+          <button class="btn ghost sm" id="sRefresh">Perbarui token</button>
+          <button class="btn ghost sm" id="sProfile">Ambil profil merchant</button>
+          <button class="btn ghost sm" id="sTx">Lihat mutasi</button>
+        </div>
+        <div id="sessMsg" class="msg"></div>
+        <div id="txBox"></div>
+      </div>
+
       <div class="card">
         <h2>Login GoPay lewat OTP</h2>
         <p class="hint">Diperlukan agar rekonsiliasi bisa menarik mutasi. Tanpa sesi, pelunasan tidak akan pernah terdeteksi.</p>
@@ -387,11 +403,12 @@ async function boot(){
     'Belum ada aplikasi terdaftar.');
 
   loadSettings().catch(()=>{});
+  loadSession().catch(()=>{});
 
   const inv=await api('/hehehe/api/invoices?limit=100').catch(()=>({invoices:[]}));
   const rows=(inv.invoices||[]).map(i=>`<tr>
     <td class="mono">${i.order_id}</td><td>${i.client_name||i.client_id}</td>
-    <td><span class="pill p-${i.status}">${i.status}</span></td>
+    <td><span class="pill p-${i.status}">${i.status}</span>${i.is_test?' <span class="pill p-EXPIRED">uji</span>':''}</td>
     <td class="mono">${i.provider}</td>
     <td class="num">${rp(i.payable_amount)}</td>
     <td class="mono">${new Date(i.created_at).toLocaleString('id-ID',{dateStyle:'short',timeStyle:'short'})}</td>
@@ -516,6 +533,55 @@ async function testProv(id){
     msg($('provMsg'),`${id}: ${d.detail}`,d.ok);}
   catch(e){msg($('provMsg'),e.message,false);}
 }
+
+// ── Sesi GoPay ──
+async function loadSession(){
+  try{
+    const d=await api('/hehehe/api/gopay/session');
+    if(!d.connected){
+      $('sessBox').innerHTML=`<p class="empty">Belum tersambung${d.reason?' — '+d.reason:''}. Login OTP di bawah.</p>`;
+      return;
+    }
+    const exp=new Date(d.expires_at);
+    const jam=Math.round((exp-Date.now())/3600000);
+    $('sessBox').innerHTML=`
+      <div class="kv"><span>Nomor HP</span><span class="mono">${d.phone_number||'—'}</span></div>
+      <div class="kv"><span>Merchant ID</span><span class="mono">${d.merchant_id||'—'}</span></div>
+      <div class="kv"><span>Outlet</span><span>${d.outlet_name||'—'}</span></div>
+      <div class="kv"><span>Refresh token</span><span>${d.has_refresh_token?'ada — sesi bisa diperpanjang':'TIDAK ADA — akan butuh OTP ulang'}</span></div>
+      <div class="kv"><span>Token berlaku sampai</span><span>${exp.toLocaleString('id-ID')} (${jam} jam lagi)</span></div>
+      ${d.last_profile_error?`<div class="kv"><span>Profil gagal diambil</span><span style="color:#c02b6f">${d.last_profile_error}</span></div>`:''}`;
+  }catch(e){$('sessBox').innerHTML=`<p class="empty">${e.message}</p>`;}
+}
+
+$('sRefresh').onclick=async()=>{
+  try{await api('/hehehe/api/gopay/session/refresh',{method:'POST'});
+    msg($('sessMsg'),'Token diperbarui.',true);loadSession();}
+  catch(e){msg($('sessMsg'),e.message,false);}
+};
+$('sProfile').onclick=async()=>{
+  try{const d=await api('/hehehe/api/gopay/session/profile',{method:'POST'});
+    msg($('sessMsg'),`Profil terambil: ${d.merchant.outletName||'(tanpa nama outlet)'}`,true);loadSession();}
+  catch(e){msg($('sessMsg'),e.message,false);}
+};
+$('sTx').onclick=async()=>{
+  try{
+    const d=await api('/hehehe/api/gopay/transactions?limit=20');
+    $('txBox').innerHTML=d.count?table('<th>ID mutasi</th><th class="num">Nominal terbaca</th><th>Waktu</th>',
+      d.transactions.map(t=>`<tr><td class="mono">${t.id}</td>
+        <td class="num">${t.amount_candidates.map(a=>'Rp'+a.toLocaleString('id-ID')).join(' / ')}</td>
+        <td class="mono">${t.transaction_time||'—'}</td></tr>`),'')
+      :'<p class="empty">Tidak ada mutasi terbaca.</p>';
+    msg($('sessMsg'),`${d.count} mutasi terbaca dari GoPay.`,true);
+  }catch(e){msg($('sessMsg'),e.message,false);$('txBox').innerHTML='';}
+};
+
+$('wipeTest').onclick=async()=>{
+  if(!confirm('Hapus seluruh invoice bertanda uji? Yang berstatus PAID tetap dipertahankan.'))return;
+  try{const d=await api('/hehehe/api/invoices/test-data',{method:'DELETE'});
+    alert(`${d.deleted} invoice uji dihapus.`);boot();}
+  catch(e){alert(e.message);}
+};
 
 // ── Pengaturan ──
 function fieldFor(it){

@@ -22,6 +22,7 @@ class Runtime {
     this.config = null;
     this.registry = null;
     this._stopReconcilers = [];
+    this._keepAliveTimer = null;
   }
 
   /** Membaca penimpaan dari database lalu membangun ulang config + registry. */
@@ -32,6 +33,7 @@ class Runtime {
     const registry = buildRegistry(config, {
       http: this.http,
       sessionStore: new SessionStore(this.pool),
+      log: this.log,
     });
 
     this.config = config;
@@ -39,6 +41,7 @@ class Runtime {
     this.effectiveEnv = env;
 
     this._restartReconcilers();
+    this._restartSessionKeepAlive();
     this.log(registry.isEmpty()
       ? 'konfigurasi dimuat: belum ada provider aktif'
       : `konfigurasi dimuat: provider ${registry.ids().join(', ')} (default: ${registry.default().constructor.id})`);
@@ -67,9 +70,35 @@ class Runtime {
     }
   }
 
+  /**
+   * Menjaga sesi provider tetap hidup, terlepas dari trafik.
+   *
+   * Rekonsiliasi hanya menyentuh token ketika ada invoice PENDING, sehingga
+   * masa tenang beberapa hari cukup untuk membuat sesi mati dan menuntut OTP
+   * ulang. Pemeriksaan berkala ini memutus ketergantungan itu.
+   */
+  _restartSessionKeepAlive() {
+    if (this._keepAliveTimer) clearInterval(this._keepAliveTimer);
+    this._keepAliveTimer = null;
+    if (!this.registry.has('gopay')) return;
+
+    const tick = async () => {
+      try {
+        const out = await this.registry.get('gopay').session.keepAlive();
+        if (out.refreshed) this.log('[sesi] token GoPay diperbarui otomatis');
+      } catch (err) {
+        this.log(`[sesi] gagal memperbarui token GoPay: ${err.message}`);
+      }
+    };
+    this._keepAliveTimer = setInterval(tick, 30 * 60_000);
+    this._keepAliveTimer.unref?.();
+    tick();
+  }
+
   stop() {
     this._stopReconcilers.forEach((s) => s());
     this._stopReconcilers = [];
+    if (this._keepAliveTimer) clearInterval(this._keepAliveTimer);
   }
 }
 

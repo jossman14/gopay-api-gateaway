@@ -77,7 +77,7 @@ function buildAdminRoutes({ pool, runtime }) {
         [status, limit]
       );
       res.json({ success: true, data: { invoices: rows.map((r) => ({
-        ...present(r), client_id: r.client_id, client_name: r.client_name,
+        ...present(r), client_id: r.client_id, client_name: r.client_name, is_test: r.is_test,
       })) } });
     } catch (err) { next(err); }
   });
@@ -252,6 +252,66 @@ function buildAdminRoutes({ pool, runtime }) {
       try { reload = await runtime.reload(); }
       catch (err) { warning = `Pengaturan tersimpan, tapi konfigurasi ditolak: ${err.message}`; }
       res.json({ success: true, data: { changed, providers: reload?.providers ?? null, warning } });
+    } catch (err) { next(err); }
+  });
+
+  /** Status sesi provider — token tidak pernah ikut. */
+  router.get('/gopay/session', async (req, res, next) => {
+    try {
+      if (!registry().has('gopay')) return res.json({ success: true, data: { connected: false, reason: 'provider gopay tidak aktif' } });
+      res.json({ success: true, data: await registry().get('gopay').session.status() });
+    } catch (err) { next(err); }
+  });
+
+  /** Memperbarui token sekarang, tanpa menunggu jadwal keep-alive. */
+  router.post('/gopay/session/refresh', async (req, res, next) => {
+    try {
+      const sm = registry().get('gopay').session;
+      await sm.getAccessToken(Date.now() + 24 * 3600_000); // paksa: anggap sudah lewat
+      res.json({ success: true, data: await sm.status() });
+    } catch (err) { next(err); }
+  });
+
+  /** Mengambil ulang profil merchant dari sesi yang ada. */
+  router.post('/gopay/session/profile', async (req, res, next) => {
+    try {
+      const sm = registry().get('gopay').session;
+      const merchant = await sm.refreshProfile();
+      res.json({ success: true, data: { merchant, session: await sm.status() } });
+    } catch (err) { next(err); }
+  });
+
+  /** Mutasi mentah dari GoPay — memperlihatkan data asli yang terbaca sesi. */
+  router.get('/gopay/transactions', async (req, res, next) => {
+    try {
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+      const list = await registry().get('gopay').listTransactions({ limit });
+      res.json({ success: true, data: { count: list.length, transactions: list.map((t) => ({
+        id: t.providerTransactionId, amount_candidates: t.amountCandidates,
+        amount_raw: t.amountRaw, transaction_time: t.transactionTime, reference: t.reference,
+      })) } });
+    } catch (err) { next(err); }
+  });
+
+  /** Menandai atau membuang penanda data uji. */
+  router.post('/invoices/:id/mark-test', async (req, res, next) => {
+    try {
+      const isTest = req.body?.is_test !== false;
+      const { rows } = await pool.query(
+        'UPDATE invoices SET is_test = $2 WHERE id = $1 RETURNING id, is_test', [req.params.id, isTest]
+      );
+      if (!rows[0]) return res.status(404).json({ success: false, errors: [{ message: 'Invoice tidak ditemukan' }] });
+      res.json({ success: true, data: rows[0] });
+    } catch (err) { next(err); }
+  });
+
+  /** Membuang seluruh invoice uji. Yang PAID tetap dilindungi. */
+  router.delete('/invoices/test-data', async (req, res, next) => {
+    try {
+      const { rowCount } = await pool.query(
+        "DELETE FROM invoices WHERE is_test = TRUE AND status <> 'PAID'"
+      );
+      res.json({ success: true, data: { deleted: rowCount } });
     } catch (err) { next(err); }
   });
 

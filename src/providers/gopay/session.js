@@ -47,12 +47,14 @@ class SessionStore {
  * membuat permintaan yang sedang berjalan gagal dengan 401.
  */
 class SessionManager {
-  constructor({ store, http, deviceId, provider = 'gopay' }) {
+  constructor({ store, http, deviceId, provider = 'gopay', log = null }) {
     this.store = store;
     this.provider = provider;
     this.deviceId = deviceId;
+    this.log = log;
     this.goid = new GoIdClient({ http, deviceId });
     this._refreshing = null;
+    this.lastProfileError = null;
   }
 
   async getAccessToken(now = Date.now()) {
@@ -93,14 +95,73 @@ class SessionManager {
   async completeLogin(phone, otpToken, otp) {
     const tokens = await this.goid.verifyOtp(otpToken, otp);
     let merchant = { merchantId: null, outletName: null };
-    try { merchant = await this.goid.fetchMerchantConfig(tokens.accessToken); }
-    catch { /* profil bersifat kosmetik; sesi tetap sah tanpanya */ }
+    try {
+      merchant = await this.goid.fetchMerchantConfig(tokens.accessToken);
+    } catch (err) {
+      // Sesi tetap sah tanpa profil, tapi kegagalannya dicatat. Menelannya diam-diam
+      // membuat "Outlet: —" tampak seperti apa adanya, padahal ada panggilan gagal.
+      this.lastProfileError = err.message;
+      this.log?.(`profil merchant gagal diambil: ${err.message}`);
+    }
     await this.store.save(this.provider, {
       phoneNumber: phone, merchantId: merchant.merchantId, outletName: merchant.outletName,
       accessToken: tokens.accessToken, refreshToken: tokens.refreshToken,
       deviceId: this.deviceId, expiresAt: tokens.expiresAt,
     });
     return { merchantId: merchant.merchantId, outletName: merchant.outletName, expiresAt: tokens.expiresAt };
+  }
+
+  /**
+   * Memperbarui token bila mendekati kedaluwarsa, terlepas dari ada tidaknya
+   * trafik.
+   *
+   * Tanpa ini sesi bisa mati sendiri: getAccessToken hanya terpanggil ketika ada
+   * invoice PENDING yang perlu dicocokkan, sehingga masa tenang beberapa hari
+   * membuat access token kedaluwarsa dan rantai refresh terputus — dan
+   * pemulihannya menuntut OTP ulang.
+   */
+  async keepAlive(now = Date.now()) {
+    const session = await this.store.load(this.provider);
+    if (!session?.refresh_token) return { refreshed: false, reason: 'belum ada sesi' };
+
+    const expiresAt = session.expires_at ? Date.parse(session.expires_at) : 0;
+    // Diperbarui saat tersisa kurang dari sepertiga umur token, jadi ada banyak
+    // kesempatan mencoba lagi sebelum benar-benar kedaluwarsa.
+    if (expiresAt - now > 8 * 3600_000) return { refreshed: false, reason: 'masih lama' };
+
+    await this.getAccessToken(now);
+    return { refreshed: true };
+  }
+
+  /** Mengambil ulang profil merchant memakai sesi yang ada. */
+  async refreshProfile() {
+    const token = await this.getAccessToken();
+    const merchant = await this.goid.fetchMerchantConfig(token);
+    const session = await this.store.load(this.provider);
+    await this.store.save(this.provider, {
+      ...camel(session),
+      merchantId: merchant.merchantId,
+      outletName: merchant.outletName,
+      deviceId: this.deviceId,
+    });
+    this.lastProfileError = null;
+    return merchant;
+  }
+
+  /** Ringkasan sesi untuk konsol. Token tidak pernah ikut. */
+  async status() {
+    const s = await this.store.load(this.provider);
+    if (!s) return { connected: false };
+    return {
+      connected: Boolean(s.access_token),
+      phone_number: s.phone_number,
+      merchant_id: s.merchant_id,
+      outlet_name: s.outlet_name,
+      has_refresh_token: Boolean(s.refresh_token),
+      expires_at: s.expires_at,
+      updated_at: s.updated_at,
+      last_profile_error: this.lastProfileError,
+    };
   }
 }
 

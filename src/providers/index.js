@@ -14,7 +14,7 @@ const { GopayProvider } = require('./gopay');
  */
 const PREFERENCE = ['gobiz', 'mayar', 'gopay'];
 
-function buildRegistry(cfg, { http, sessionStore } = {}) {
+function buildRegistry(cfg, { http, sessionStore, log } = {}) {
   const registry = new Map();
 
   if (cfg.providers.gobiz.enabled) {
@@ -30,6 +30,7 @@ function buildRegistry(cfg, { http, sessionStore } = {}) {
       deviceId: cfg.providers.gopay.deviceId,
       qrisStatic: cfg.providers.gopay.qrisStatic,
       unique: cfg.invoice,
+      log,
     }));
   }
 
