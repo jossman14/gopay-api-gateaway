@@ -76,3 +76,20 @@ test('blok kode digulir mendatar, tidak memaksa halaman melebar', () => {
   const css = HTML.slice(HTML.indexOf('<style>'), HTML.indexOf('</style>'));
   assert.match(css, /\.code pre\{[^}]*overflow-x:\s*auto/);
 });
+
+test('tombol ber-data-act punya delegasi kliknya', () => {
+  // Baris tabel klien dirender dengan data-act="guide|edit|del". Tanpa
+  // delegasi klik yang membaca atribut itu, ketiga tombolnya mati —
+  // persis bug yang pernah membuat Panduan/Ubah/Hapus tidak bisa diklik.
+  const acts = [...HTML.matchAll(/data-act="([a-z]+)"/g)].map((m) => m[1]);
+  const unik = [...new Set(acts)];
+  if (!unik.length) return;
+  const js = scriptBody();
+  assert.match(js, /document\.addEventListener\('click'[^)]*\[data-act\]/,
+    'harus ada delegasi klik yang membaca [data-act]');
+  for (const a of unik) {
+    assert.ok(js.includes(`'${a}'`), `aksi "${a}" harus ditangani delegasi`);
+  }
+  // Delegasi menangkap tombol lewat closest(), jadi klik ikon di dalam
+  // tombol pun sampai.
+});

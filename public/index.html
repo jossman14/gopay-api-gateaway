@@ -616,6 +616,17 @@ document.addEventListener('click',e=>{
 });
 $('modal').onclick=e=>{if(e.target===$('modal'))closeModal();};
 
+// Tombol aksi pada baris tabel klien dirender dengan data-act/data-id.
+// Tanpa delegasi ini tombolnya tidak pernah terhubung ke fungsinya.
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]'); if(!b)return;
+  const id=b.dataset.id; if(!id)return;
+  const c=(window._clients||[]).find(x=>x.id===id);
+  if(b.dataset.act==='guide')guideClient(id,c&&c.callback_url);
+  else if(b.dataset.act==='edit')editClient(id,c?c.name:'',c?c.callback_url:'',!!(c&&c.active));
+  else if(b.dataset.act==='del')delClient(id);
+});
+
 function keyModal(title,note,key){
   openModal(`<h3>${title}</h3><p class="hint">${note}</p>
     <div class="keybox">${key}</div>
