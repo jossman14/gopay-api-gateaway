@@ -11,14 +11,15 @@ const { enqueue } = require('../../webhooks/deliver');
  * diberitahukan, bukan ditemukan. Setiap kiriman diverifikasi dulu — endpoint
  * ini publik, jadi tanpa verifikasi siapa pun bisa menandai invoice lunas.
  */
-function buildWebhookRoutes({ pool, registry, log = () => {} }) {
+function buildWebhookRoutes({ pool, runtime, log = () => {} }) {
+  const registry = () => runtime.registry;
   const router = express.Router();
 
   /** GoBiz: notifikasi transaksi pembayaran. */
   router.post('/gobiz', async (req, res, next) => {
     try {
-      if (!registry.has('gobiz')) return res.status(404).json({ success: false });
-      const provider = registry.get('gobiz');
+      if (!registry().has('gobiz')) return res.status(404).json({ success: false });
+      const provider = registry().get('gobiz');
       const body = req.body || {};
       const trxId = body?.body?.transaction?.id ?? body?.transaction?.id ?? null;
       if (!trxId) return res.status(400).json({ success: false, errors: [{ message: 'transaction id tidak ada' }] });
@@ -53,8 +54,8 @@ function buildWebhookRoutes({ pool, registry, log = () => {} }) {
   /** Mayar: notifikasi invoice. Diverifikasi lewat X-Callback-Token. */
   router.post('/mayar', async (req, res, next) => {
     try {
-      if (!registry.has('mayar')) return res.status(404).json({ success: false });
-      const provider = registry.get('mayar');
+      if (!registry().has('mayar')) return res.status(404).json({ success: false });
+      const provider = registry().get('mayar');
       if (!provider.verifyWebhook(req.headers)) {
         return res.status(401).json({ success: false, errors: [{ message: 'Token callback tidak valid' }] });
       }

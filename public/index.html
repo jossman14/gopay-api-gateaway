@@ -141,6 +141,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
       <a href="#inv" data-v="inv">Invoice</a>
       <a href="#clients" data-v="clients">Aplikasi</a>
       <a href="#provider" data-v="provider">Provider</a>
+      <a href="#settings" data-v="settings">Pengaturan</a>
     </nav>
     <div class="spacer"></div>
     <div class="who" id="who"></div>
@@ -215,6 +216,18 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
         <div id="otpMsg" class="msg"></div>
       </div>
     </section>
+
+    <section data-view="settings" class="hidden">
+      <div class="card">
+        <h2>Pengaturan</h2>
+        <p class="hint">Nilai di sini menimpa environment dan langsung berlaku tanpa redeploy.
+          Kolom rahasia hanya menampilkan status terisi, tidak pernah isinya —
+          kosongkan untuk kembali memakai nilai environment.</p>
+        <div id="settings"></div>
+        <div class="row"><button class="btn" id="saveSettings">Simpan &amp; terapkan</button></div>
+        <div id="setMsg" class="msg"></div>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -227,9 +240,10 @@ const ICONS={
  money:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5.5 5.5L20 7"/></svg>',
  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+ gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
  doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>'};
 document.querySelectorAll('nav a').forEach(a=>{
-  const m={dash:'home',inv:'list',clients:'users',provider:'plug'}[a.dataset.v];
+  const m={dash:'home',inv:'list',clients:'users',provider:'plug',settings:'gear'}[a.dataset.v];
   a.innerHTML=ICONS[m]+a.textContent.trim();
 });
 
@@ -277,7 +291,8 @@ document.querySelectorAll('nav a').forEach(a=>a.onclick=e=>{
   $('greet').textContent=a.textContent.trim();
   $('subtitle').textContent={dash:'Ringkasan pemasukan seluruh aplikasi.',
     inv:'Setiap tagihan yang pernah dibuat.',clients:'Aplikasi yang memakai gateway ini.',
-    provider:'Jalur pembayaran dan sesi.'}[v];
+    provider:'Jalur pembayaran dan sesi.',
+    settings:'Seluruh konfigurasi gateway.'}[v];
 });
 
 $('refresh').onclick=boot;
@@ -342,6 +357,8 @@ async function boot(){
       <td class="mono">${c.api_key_prefix}</td><td class="mono">${c.callback_url||'—'}</td></tr>`),
     'Belum ada aplikasi terdaftar.');
 
+  loadSettings().catch(()=>{});
+
   const inv=await api('/hehehe/api/invoices?limit=100').catch(()=>({invoices:[]}));
   const rows=(inv.invoices||[]).map(i=>`<tr>
     <td class="mono">${i.order_id}</td><td>${i.client_name||i.client_id}</td>
@@ -353,6 +370,50 @@ async function boot(){
   $('invoices').innerHTML=table(head,rows,'Belum ada invoice.');
   $('recent').innerHTML=table(head,rows.slice(0,6),'Belum ada invoice.');
 }
+
+// ── Pengaturan ──
+function fieldFor(it){
+  const id='set_'+it.key;
+  if(it.type==='bool'){
+    const on=String(it.value).toLowerCase()==='true';
+    return `<select id="${id}" class="field" data-key="${it.key}">
+      <option value="true"${on?' selected':''}>Aktif</option>
+      <option value="false"${!on?' selected':''}>Nonaktif</option></select>`;
+  }
+  if(it.type==='secret'){
+    return `<input id="${id}" class="field" type="password" data-key="${it.key}" data-secret="1"
+      placeholder="${it.set?'••••••  (sudah terisi, kosongkan untuk membiarkan)':'belum diisi'}">`;
+  }
+  return `<input id="${id}" class="field" type="${it.type==='int'?'number':'text'}"
+    data-key="${it.key}" value="${it.value??''}">`;
+}
+
+async function loadSettings(){
+  const d=await api('/hehehe/api/settings');
+  $('settings').innerHTML=d.groups.map(g=>`
+    <div style="margin-bottom:26px">
+      <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 10px">${g.label}</h3>
+      ${g.items.map(it=>`<label for="set_${it.key}">${it.label}
+        <span style="opacity:.6;font-weight:400"> · ${it.source}</span></label>${fieldFor(it)}`).join('')}
+    </div>`).join('');
+}
+
+$('saveSettings').onclick=async()=>{
+  const body={};
+  document.querySelectorAll('#settings [data-key]').forEach(el=>{
+    // Rahasia yang dibiarkan kosong TIDAK dikirim, agar tidak menimpa nilai
+    // yang sudah tersimpan dengan string kosong.
+    if(el.dataset.secret && el.value==='')return;
+    body[el.dataset.key]=el.value;
+  });
+  $('saveSettings').disabled=true;
+  try{
+    const d=await api('/hehehe/api/settings',{method:'PUT',body:JSON.stringify(body)});
+    msg($('setMsg'), d.warning || `${d.changed} pengaturan tersimpan. Provider aktif: ${(d.providers||[]).join(', ')||'belum ada'}.`, !d.warning);
+    await loadSettings(); boot();
+  }catch(e){msg($('setMsg'),e.message,false);}
+  finally{$('saveSettings').disabled=false;}
+};
 
 // ── OTP GoPay ──
 let otpToken=null;

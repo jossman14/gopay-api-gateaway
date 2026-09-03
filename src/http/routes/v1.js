@@ -12,7 +12,9 @@ const { enqueue } = require('../../webhooks/deliver');
  * Setiap rute dibatasi pada req.client: satu aplikasi tidak akan pernah melihat
  * invoice milik aplikasi lain sekalipun menebak ID-nya.
  */
-function buildV1Routes({ pool, registry, config }) {
+function buildV1Routes({ pool, runtime }) {
+  const registry = () => runtime.registry;
+  const config = () => runtime.config;
   const router = express.Router();
 
   /** Membuat invoice. Idempoten terhadap order_id milik klien. */
@@ -22,12 +24,12 @@ function buildV1Routes({ pool, registry, config }) {
       if (!orderId || typeof orderId !== 'string') {
         return res.status(400).json({ success: false, errors: [{ message: 'order_id wajib diisi' }] });
       }
-      const provider = providerId ? registry.get(providerId) : registry.default();
+      const provider = providerId ? registry().get(providerId) : registry().default();
 
       const { invoice, created } = await invoices.createInvoice(pool, {
         client: req.client, orderId, amount: Number(amount), provider,
         callbackUrl, metadata: metadata || {},
-        expiryMs: config.invoice.expiryMs, unique: config.invoice,
+        expiryMs: config().invoice.expiryMs, unique: config().invoice,
       });
 
       res.status(created ? 201 : 200).json({ success: true, data: { invoice: present(invoice) } });

@@ -5,6 +5,7 @@ const clients = require('../../domain/clients');
 const reports = require('../../domain/reports');
 const { reconcileOnce } = require('../../domain/reconcile');
 const { present } = require('./v1');
+const settings = require('../../domain/settings');
 
 /**
  * Rute admin — pandangan master lintas seluruh aplikasi.
@@ -12,7 +13,9 @@ const { present } = require('./v1');
  * Berbeda dari /v1 yang selalu dibatasi satu klien, di sini justru
  * gabungannya: siapa menghasilkan berapa, lewat provider apa.
  */
-function buildAdminRoutes({ pool, registry, config }) {
+function buildAdminRoutes({ pool, runtime }) {
+  const registry = () => runtime.registry;
+  const config = () => runtime.config;
   const router = express.Router();
 
   /** Siapa yang sedang login — dipakai konsol untuk memutuskan tampilan. */
@@ -97,10 +100,10 @@ function buildAdminRoutes({ pool, registry, config }) {
   router.post('/reconcile', async (req, res, next) => {
     try {
       const id = req.body?.provider || 'gopay';
-      if (!registry.has(id)) {
+      if (!registry().has(id)) {
         return res.status(400).json({ success: false, errors: [{ message: `Provider ${id} tidak aktif` }] });
       }
-      const provider = registry.get(id);
+      const provider = registry().get(id);
       if (provider.supportsWebhook) {
         return res.status(400).json({ success: false, errors: [{ message: `Provider ${id} memakai webhook; rekonsiliasi tidak diperlukan` }] });
       }
@@ -111,7 +114,7 @@ function buildAdminRoutes({ pool, registry, config }) {
   /** Login OTP GoPay, langkah 1 — menggantikan `node login.js` yang interaktif. */
   router.post('/gopay/login/request', async (req, res, next) => {
     try {
-      const provider = registry.get('gopay');
+      const provider = registry().get('gopay');
       const out = await provider.session.startLogin(req.body?.phone_number);
       res.json({ success: true, data: { otp_token: out.otpToken, otp_length: out.otpLength } });
     } catch (err) { next(err); }
@@ -121,8 +124,33 @@ function buildAdminRoutes({ pool, registry, config }) {
   router.post('/gopay/login/verify', async (req, res, next) => {
     try {
       const { phone_number: phone, otp_token: otpToken, otp } = req.body || {};
-      const provider = registry.get('gopay');
+      const provider = registry().get('gopay');
       res.json({ success: true, data: await provider.session.completeLogin(phone, otpToken, otp) });
+    } catch (err) { next(err); }
+  });
+
+  /** Seluruh pengaturan, dikelompokkan. Rahasia tidak pernah ikut nilainya. */
+  router.get('/settings', async (req, res, next) => {
+    try {
+      res.json({ success: true, data: { groups: await settings.describe(pool, runtime.effectiveEnv) } });
+    } catch (err) { next(err); }
+  });
+
+  /**
+   * Menyimpan pengaturan lalu memuat ulang konfigurasi.
+   *
+   * Reload dilakukan di sini agar perubahan kredensial langsung berlaku tanpa
+   * redeploy. Bila konfigurasi baru tidak sah, reload melempar dan perubahan
+   * tetap tersimpan — pesannya dikembalikan supaya operator bisa memperbaiki.
+   */
+  router.put('/settings', async (req, res, next) => {
+    try {
+      const changed = await settings.save(pool, req.body || {}, req.admin?.email || req.admin?.via);
+      let reload = null;
+      let warning = null;
+      try { reload = await runtime.reload(); }
+      catch (err) { warning = `Pengaturan tersimpan, tapi konfigurasi ditolak: ${err.message}`; }
+      res.json({ success: true, data: { changed, providers: reload?.providers ?? null, warning } });
     } catch (err) { next(err); }
   });
 
@@ -130,10 +158,10 @@ function buildAdminRoutes({ pool, registry, config }) {
     res.json({
       success: true,
       data: {
-        active: registry.ids(),
-        default: registry.default().constructor.id,
-        detail: registry.ids().map((id) => {
-          const p = registry.get(id);
+        active: registry().ids(),
+        default: registry().default().constructor.id,
+        detail: registry().ids().map((id) => {
+          const p = registry().get(id);
           return { id, supports_webhook: p.supportsWebhook, needs_unique_amount: p.needsUniqueAmount };
         }),
       },

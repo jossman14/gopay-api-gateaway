@@ -33,7 +33,9 @@ function loginLimiter({ windowMs = 60_000, max = 8 } = {}) {
   };
 }
 
-function buildApp({ pool, registry, config, log = console.log }) {
+function buildApp({ pool, runtime, log = console.log }) {
+  const config = runtime.config;
+  const registry = runtime.registry;
   const app = express();
   app.disable('x-powered-by');
 
@@ -44,7 +46,7 @@ function buildApp({ pool, registry, config, log = console.log }) {
   app.get('/health', async (req, res) => {
     try {
       await pool.query('SELECT 1');
-      res.json({ success: true, data: { status: 'ok', providers: registry.ids() } });
+      res.json({ success: true, data: { status: 'ok', providers: runtime.registry.ids() } });
     } catch (err) {
       res.status(503).json({ success: false, errors: [{ message: 'Database tidak dapat dijangkau' }] });
     }
@@ -52,9 +54,9 @@ function buildApp({ pool, registry, config, log = console.log }) {
 
   // Webhook provider TIDAK memakai API key: pengirimnya provider, bukan klien.
   // Keasliannya dibuktikan dengan menanyakan ulang status ke provider.
-  app.use('/webhooks', buildWebhookRoutes({ pool, registry, log }));
+  app.use('/webhooks', buildWebhookRoutes({ pool, runtime, log }));
 
-  app.use('/v1', apiKeyAuth(pool), buildV1Routes({ pool, registry, config }));
+  app.use('/v1', apiKeyAuth(pool), buildV1Routes({ pool, runtime }));
 
   // Login TIDAK boleh berada di balik adminAuth — kalau tidak, tidak ada cara
   // memperoleh sesi untuk pertama kali.
@@ -83,7 +85,7 @@ function buildApp({ pool, registry, config, log = console.log }) {
     res.json({ success: true, data: {} });
   });
 
-  app.use('/hehehe/api', adminAuth(config), buildAdminRoutes({ pool, registry, config }));
+  app.use('/hehehe/api', adminAuth(runtime.config), buildAdminRoutes({ pool, runtime }));
 
   // Konsol admin. Halamannya statis dan tidak memuat rahasia: kredensial
   // dimasukkan pengguna dan ditukar dengan cookie sesi HttpOnly, sehingga token
