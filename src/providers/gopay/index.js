@@ -141,6 +141,20 @@ function normalizeTransaction(tx, scale = 100) {
     transactionTime: tx.transaction_time ?? tx.created_at ?? tx.time ?? null,
     orderId: tx.order_id ?? null,
     reference: tx.gopay_transaction_reference ?? tx.reference ?? tx.merchant_reference ?? null,
+    // Field tambahan dari Merchant Analytics. Dibawa serta karena saat sebuah
+    // pembayaran dipersoalkan, yang menjawabnya justru detail seperti ini —
+    // linimasa perubahan status, jenis layanan, dan kapan QR kedaluwarsa.
+    detail: {
+      wallstreet_transaction_id: tx.wallstreet_transaction_id ?? null,
+      merchant_id: tx.merchant_id ?? null,
+      payment_type: tx.payment_type ?? null,
+      service_type: tx.service_type ?? null,
+      qris_issuer: tx.qris_provider_aspi_issuer || null,
+      expire_time: tx.expire_time ?? null,
+      pop_id: tx.pop_id ?? null,
+      promo: tx.promo_details ?? null,
+      history: Array.isArray(tx.transaction_history) ? tx.transaction_history : [],
+    },
     raw: tx,
   };
 }

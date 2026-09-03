@@ -310,6 +310,7 @@ function buildAdminRoutes({ pool, runtime }) {
         order_id: t.orderId,
         transaction_time: t.transactionTime,
         reference: t.reference,
+        detail: t.detail,
       })) } });
     } catch (err) { next(err); }
   });
@@ -334,6 +335,29 @@ function buildAdminRoutes({ pool, runtime }) {
       );
       res.json({ success: true, data: { deleted: rowCount } });
     } catch (err) { next(err); }
+  });
+
+  /**
+   * Apakah QRIS statis sudah dikonfigurasi, dan merchant siapa.
+   *
+   * Payload penuh tidak dikembalikan. Ia memang tercetak di konter dan bisa
+   * dipindai siapa saja, tapi tidak ada alasan menaruhnya di respons API yang
+   * bisa tersimpan di riwayat browser atau tangkapan layar. Yang dibutuhkan
+   * konsol hanya: sudah terisi atau belum, dan milik siapa.
+   */
+  router.get('/qris/configured', (req, res) => {
+    const payload = config().providers.gopay.qrisStatic;
+    if (!payload) return res.json({ success: true, data: { configured: false } });
+    try {
+      const r = qrisInspect.inspect(payload);
+      res.json({ success: true, data: {
+        configured: true, valid: r.valid, is_static: r.is_static,
+        merchant_name: r.merchant_name, merchant_city: r.merchant_city,
+        length: r.length, problems: r.problems,
+      } });
+    } catch (err) {
+      res.json({ success: true, data: { configured: true, valid: false, problems: [err.message] } });
+    }
   });
 
   /**

@@ -300,8 +300,10 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
             <h2>Periksa payload QRIS</h2>
             <p class="hint">Kosongkan untuk memakai QRIS_STATIC yang tersimpan di Pengaturan.
               Payload tidak disimpan oleh pemeriksaan ini.</p>
-            <label for="qPayload">Payload QRIS statis</label>
-            <textarea id="qPayload" class="field" rows="4" placeholder="00020101021126..."
+            <div id="qConfigured"></div>
+            <label for="qPayload">Payload QRIS statis
+              <span style="opacity:.7;font-weight:400">— kosongkan untuk memakai yang tersimpan</span></label>
+            <textarea id="qPayload" class="field" rows="3" placeholder="biarkan kosong: memakai QRIS_STATIC dari Pengaturan"
               style="font-family:ui-monospace,Menlo,monospace;font-size:12px;resize:vertical"></textarea>
             <label for="qAmount">Nominal percobaan (Rp)</label>
             <input id="qAmount" class="field" type="number" value="50001">
@@ -490,6 +492,7 @@ async function boot(){
   loadSettings().catch(()=>{});
   loadSession().catch(()=>{});
   loadTx().catch(()=>{});
+  loadQrisConfig().catch(()=>{});
 
   const inv=await api('/hehehe/api/invoices?limit=100').catch(()=>({invoices:[]}));
   const rows=(inv.invoices||[]).map(i=>`<tr>
@@ -620,6 +623,22 @@ async function testProv(id){
   catch(e){msg($('provMsg'),e.message,false);}
 }
 
+// ── QRIS terkonfigurasi ──
+async function loadQrisConfig(){
+  try{
+    const d=await api('/hehehe/api/qris/configured');
+    if(!d.configured){
+      $('qConfigured').innerHTML=`<div class="msg show bad" style="margin:0 0 12px">
+        QRIS statis belum diatur. Isi di <b>Pengaturan → GoPay → Payload QRIS statis merchant</b>,
+        lalu halaman ini memakainya otomatis.</div>`;
+      return;
+    }
+    $('qConfigured').innerHTML=`<div class="msg show ${d.valid?'ok':'bad'}" style="margin:0 0 12px">
+      Memakai QRIS tersimpan: <b>${d.merchant_name||'(tanpa nama)'}</b>${d.merchant_city?' · '+d.merchant_city:''}
+      · ${d.length} karakter${d.valid?'':' — '+(d.problems||[]).join(' ')}</div>`;
+  }catch(e){ $('qConfigured').innerHTML=''; }
+}
+
 // ── Transaksi ──
 async function loadTx(){
   try{
@@ -641,21 +660,50 @@ $('txLive').onclick=async()=>{
   $('txLive').disabled=true;
   try{
     const days=$('txDays').value, st=$('txStatus').value;
+    window._tx=[];
     const d=await api(`/hehehe/api/gopay/transactions?limit=100&days=${days}`+
       (st?`&statuses=${encodeURIComponent(st)}`:''));
     $('txLiveList').innerHTML=d.count?table(
       '<th>ID mutasi</th><th>Status</th><th class="num">Nominal</th><th>Waktu</th>',
-      d.transactions.map(t=>`<tr><td class="mono">${t.id}</td>
+      d.transactions.map((t,idx)=>`<tr style="cursor:pointer" onclick="txDetail(${idx})">
+        <td class="mono">${t.id.slice(0,18)}…</td>
         <td><span class="pill ${t.settled?'p-PAID':'p-CANCELLED'}">${t.status||'—'}</span></td>
         <td class="num">${rp(t.amount)}<br><span style="font-size:11px;color:var(--muted)">dilaporkan ${t.amount_raw} ÷ ${t.amount_scale}</span></td>
         <td class="mono">${t.transaction_time||'—'}</td></tr>`),'')
       :`<p class="empty">Tidak ada mutasi dalam ${d.days} hari terakhir.</p>`;
+    window._tx=d.transactions;
     const diterima=d.transactions.filter(t=>t.settled).length;
     msg($('txMsg'),`${d.count} mutasi dalam ${d.days} hari. ${diterima} diterima, `+
       `${d.count-diterima} tidak — yang tidak diterima tidak akan pernah melunasi invoice.`,true);
   }catch(e){msg($('txMsg'),e.message,false);}
   finally{$('txLive').disabled=false;}
 };
+
+function txDetail(i){
+  const t=(window._tx||[])[i]; if(!t)return;
+  const dt=t.detail||{};
+  const hist=(dt.history||[]).map(h=>`<div class="kv">
+    <span>${h.action||h.status||h.type||'perubahan'}</span>
+    <span class="mono" style="font-size:11px">${h.action_time||h.time||'—'}</span></div>`).join('')
+    ||'<p class="empty">Tidak ada linimasa.</p>';
+  openModal(`<h3>Detail mutasi</h3>
+    <p class="hint">Seluruh field yang dikembalikan Merchant Analytics.</p>
+    <div class="kv"><span>Status</span><span class="pill ${t.settled?'p-PAID':'p-CANCELLED'}">${t.status||'—'}</span></div>
+    <div class="kv"><span>Nominal</span><span><b>${rp(t.amount)}</b> <span style="color:var(--muted);font-size:12px">(dilaporkan ${t.amount_raw})</span></span></div>
+    <div class="kv"><span>ID mutasi</span><span class="mono" style="font-size:11px">${t.id}</span></div>
+    <div class="kv"><span>Order ID GoPay</span><span class="mono" style="font-size:11px">${t.order_id||'—'}</span></div>
+    <div class="kv"><span>Referensi</span><span class="mono">${t.reference||'—'}</span></div>
+    <div class="kv"><span>Jenis</span><span>${dt.payment_type||'—'}${dt.service_type&&dt.service_type!==dt.payment_type?' · '+dt.service_type:''}</span></div>
+    <div class="kv"><span>Penerbit QRIS</span><span>${dt.qris_issuer||'—'}</span></div>
+    <div class="kv"><span>Waktu transaksi</span><span class="mono" style="font-size:12px">${t.transaction_time||'—'}</span></div>
+    <div class="kv"><span>Kedaluwarsa QR</span><span class="mono" style="font-size:12px">${dt.expire_time||'—'}</span></div>
+    <div class="kv"><span>Merchant</span><span class="mono">${dt.merchant_id||'—'}</span></div>
+    <div class="kv"><span>Wallstreet ID</span><span class="mono" style="font-size:11px">${dt.wallstreet_transaction_id||'—'}</span></div>
+    ${dt.promo&&dt.promo.promo_code?`<div class="kv"><span>Promo</span><span>${dt.promo.promo_code}</span></div>`:''}
+    <h3 style="font-size:14px;margin:18px 0 6px">Linimasa</h3>${hist}
+    <div class="row"><button class="btn" id="dClose">Tutup</button></div>`);
+  $('dClose').onclick=closeModal;
+}
 
 // ── Uji QRIS ──
 let qPoll=null;
