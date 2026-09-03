@@ -122,6 +122,22 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .keybox{background:#f7f6fc;border:1px solid var(--line);border-radius:11px;padding:11px;
   font-family:ui-monospace,Menlo,monospace;font-size:12.5px;word-break:break-all;margin-top:10px}
 .head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:4px}
+.step{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.step:last-child{border-bottom:0}
+.step .n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex:none;
+  font-size:12px;font-weight:700;background:#f1f0f6;color:var(--muted)}
+.step.ok .n{background:var(--green-soft);color:var(--green)}
+.step.now .n{background:var(--violet);color:#fff}
+.step .t{flex:1;min-width:0}
+.step .t b{display:block;font-size:14px;font-weight:600}
+.step .t span{font-size:12.5px;color:var(--muted)}
+.step.now .t b{color:var(--violet)}
+.banner{background:linear-gradient(135deg,#7c5cff,#9d7fff);color:#fff;border-radius:var(--r);
+  padding:18px 20px;margin-bottom:18px;display:flex;justify-content:space-between;
+  align-items:center;gap:16px;flex-wrap:wrap}
+.banner b{font-size:15px}
+.banner p{margin:3px 0 0;opacity:.9;font-size:13px}
+.banner button{background:#fff;color:var(--violet)}
 .kv span:first-child{color:var(--muted)}
 </style>
 </head>
@@ -170,6 +186,14 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 
     <section data-view="dash">
       <div class="tiles" id="tiles"></div>
+      <div id="setupBanner"></div>
+      <div class="card" id="setupCard" style="display:none">
+        <div class="head"><div><h2>Langkah penyiapan</h2>
+          <p class="hint">Selesaikan berurutan. Tiap langkah menyebut apa yang kurang dan ke mana harus pergi.</p></div>
+          <button class="btn ghost sm" id="setupHide">Sembunyikan</button></div>
+        <div id="setupSteps"></div>
+      </div>
+
       <div class="card" id="reconCard">
         <div class="head"><div><h2>Uang masuk vs tercatat</h2>
           <p class="hint">Membandingkan mutasi di akun merchant dengan yang berhasil dikaitkan ke pesanan.
@@ -473,6 +497,7 @@ async function boot(){
 
   $('chart').innerHTML=chart(rev.daily||[]);
   loadRecon().catch(()=>{});
+  loadSetup().catch(()=>{});
 
   $('byClient').innerHTML=table('<th>Aplikasi</th><th class="num">Lunas</th><th class="num">Pemasukan</th>',
     (rev.by_client||[]).map(c=>`<tr><td>${c.name}</td><td class="num">${c.paid_count}</td>
@@ -695,6 +720,44 @@ async function testProv(id){
     msg($('provMsg'),`${id}: ${d.detail}`,d.ok);}
   catch(e){msg($('provMsg'),e.message,false);}
 }
+
+// ── Kesiapan sistem ──
+function gotoView(v){
+  const a=document.querySelector(`nav a[data-v="${v}"]`);
+  if(a) a.click();
+}
+
+async function loadSetup(){
+  try{
+    const d=await api('/hehehe/api/setup-status');
+    const sembunyi=localStorage.getItem('pg_hide_setup')==='1';
+
+    if(d.siap){
+      $('setupBanner').innerHTML='';
+      $('setupCard').style.display=sembunyi?'none':'block';
+    }else{
+      const n=d.berikutnya;
+      $('setupBanner').innerHTML=`<div class="banner">
+        <div><b>Belum siap menerima pembayaran</b>
+          <p>${d.selesai} dari ${d.total} langkah selesai. Berikutnya: ${n?n.label:'—'}${n&&n.detail?` — ${n.detail}`:''}</p></div>
+        ${n?`<button class="btn sm" onclick="gotoView('${n.view}')">Ke ${n.aksi}</button>`:''}
+      </div>`;
+      $('setupCard').style.display='block';
+    }
+
+    let sampai=false;
+    $('setupSteps').innerHTML=d.langkah.map((l,i)=>{
+      const kini=!l.selesai&&!sampai&&l.wajib!==false;
+      if(kini)sampai=true;
+      return `<div class="step ${l.selesai?'ok':''} ${kini?'now':''}">
+        <div class="n">${l.selesai?'✓':i+1}</div>
+        <div class="t"><b>${l.label}</b><span>${l.detail}</span></div>
+        ${l.selesai?'':`<button class="ib" onclick="gotoView('${l.view}')">${l.aksi}</button>`}
+      </div>`;
+    }).join('');
+  }catch(e){ $('setupBanner').innerHTML=''; }
+}
+$('setupHide').onclick=()=>{ localStorage.setItem('pg_hide_setup','1'); $('setupCard').style.display='none'; };
 
 // ── Rekonsiliasi: uang masuk vs tercatat ──
 async function loadRecon(){

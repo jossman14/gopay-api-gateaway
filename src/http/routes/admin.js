@@ -284,6 +284,79 @@ function buildAdminRoutes({ pool, runtime }) {
     } catch (err) { next(err); }
   });
 
+  /**
+   * Kesiapan sistem, langkah demi langkah.
+   *
+   * Konsol tanpa ini menampilkan dashboard berisi angka nol tanpa memberi tahu
+   * apa yang kurang, dan pengguna baru tidak punya cara mengetahui bahwa
+   * pembuatan tagihan akan gagal sampai ia mencobanya. Tiap langkah menyebut
+   * apa yang salah dan ke mana harus pergi.
+   */
+  router.get('/setup-status', async (req, res, next) => {
+    try {
+      const cfg = config();
+      const langkah = [];
+
+      const adaProvider = !registry().isEmpty();
+      langkah.push({
+        id: 'provider', label: 'Aktifkan provider pembayaran', selesai: adaProvider,
+        detail: adaProvider ? `Aktif: ${registry().ids().join(', ')}` : 'Belum ada provider aktif',
+        aksi: 'Pengaturan', view: 'settings',
+      });
+
+      let sesi = { connected: false };
+      if (registry().has('gopay')) {
+        try { sesi = await registry().get('gopay').session.status(); } catch { /* diabaikan */ }
+      }
+      const perluSesi = registry().has('gopay');
+      langkah.push({
+        id: 'sesi', label: 'Hubungkan akun merchant (login OTP)',
+        selesai: !perluSesi || Boolean(sesi.connected),
+        wajib: perluSesi,
+        detail: !perluSesi ? 'Tidak diperlukan untuk provider resmi'
+          : sesi.connected ? `Tersambung: ${sesi.outlet_name || sesi.phone_number}`
+          : 'Belum login — pelunasan tidak akan pernah terdeteksi',
+        aksi: 'Provider', view: 'provider',
+      });
+
+      const adaQris = Boolean(cfg.providers.gopay.qrisStatic);
+      langkah.push({
+        id: 'qris', label: 'Isi payload QRIS statis merchant',
+        selesai: !registry().has('gopay') || adaQris,
+        wajib: registry().has('gopay'),
+        detail: adaQris ? 'Terisi dan sah' : 'Belum diisi — pembuatan tagihan akan ditolak',
+        aksi: 'Uji QRIS', view: 'qris',
+      });
+
+      const { rows: c } = await pool.query('SELECT count(*)::int n FROM clients WHERE active = TRUE');
+      langkah.push({
+        id: 'aplikasi', label: 'Daftarkan aplikasi yang akan memakai gateway',
+        selesai: c[0].n > 0,
+        detail: c[0].n > 0 ? `${c[0].n} aplikasi terdaftar` : 'Belum ada aplikasi',
+        aksi: 'Aplikasi', view: 'clients',
+      });
+
+      const { rows: p2 } = await pool.query(
+        "SELECT count(*)::int n FROM invoices WHERE status = 'PAID' AND is_test = FALSE"
+      );
+      langkah.push({
+        id: 'transaksi', label: 'Terima pembayaran sungguhan pertama',
+        selesai: p2[0].n > 0,
+        detail: p2[0].n > 0 ? `${p2[0].n} pembayaran tercatat` : 'Belum ada — uji dulu lewat menu Uji QRIS',
+        aksi: 'Uji QRIS', view: 'qris',
+      });
+
+      const wajibBelum = langkah.filter((l) => !l.selesai && l.wajib !== false);
+      res.json({ success: true, data: {
+        siap: wajibBelum.length === 0,
+        selesai: langkah.filter((l) => l.selesai).length,
+        total: langkah.length,
+        berikutnya: wajibBelum[0] ?? null,
+        langkah,
+      } });
+    } catch (err) { next(err); }
+  });
+
   /** Seluruh pengaturan, dikelompokkan. Rahasia tidak pernah ikut nilainya. */
   router.get('/settings', async (req, res, next) => {
     try {
