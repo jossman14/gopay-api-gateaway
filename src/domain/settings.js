@@ -42,6 +42,7 @@ const SCHEMA = {
   GOPAY_ENABLED:   { group: 'gopay', type: 'bool', label: 'Aktifkan GoPay (cadangan)' },
   GOPAY_DEVICE_ID: { group: 'gopay', type: 'text', label: 'Device ID (UUID tetap)' },
   QRIS_STATIC:     { group: 'gopay', type: 'secret', label: 'Payload QRIS statis merchant' },
+  GOPAY_AMOUNT_SCALE: { group: 'gopay', type: 'int', label: 'Skala nominal (100 = provider lapor satuan minor)' },
 };
 
 const GROUPS = {

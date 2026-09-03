@@ -29,6 +29,7 @@ function buildRegistry(cfg, { http, sessionStore, log } = {}) {
       sessionStore,
       deviceId: cfg.providers.gopay.deviceId,
       qrisStatic: cfg.providers.gopay.qrisStatic,
+      amountScale: cfg.providers.gopay.amountScale,
       unique: cfg.invoice,
       log,
     }));

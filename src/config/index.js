@@ -78,6 +78,10 @@ function load(env = process.env) {
         enabled: bool(env.GOPAY_ENABLED, false),
         deviceId: env.GOPAY_DEVICE_ID || null,
         qrisStatic: env.QRIS_STATIC || null,
+        // GoPay Merchant Analytics melaporkan IDR dalam satuan minor
+        // (Rp11 terbaca 1100). Skala salah membuat pembayaran tidak pernah
+        // cocok — terlihat, bukan diam-diam salah kredit.
+        amountScale: int(env.GOPAY_AMOUNT_SCALE, 100),
       },
       mayar: {
         enabled: bool(env.MAYAR_ENABLED, false),

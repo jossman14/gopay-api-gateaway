@@ -33,46 +33,38 @@ async function reconcileOnce(pool, provider, { log = () => {} } = {}) {
   }
   stats.seen = transactions.length;
 
-  // Indeks nominal -> invoice. Constraint database sudah menjamin tidak ada dua
+  // Indeks nominal -> invoice. Constraint database menjamin tidak ada dua
   // invoice PENDING bernominal sama untuk satu provider, jadi pemetaan ini
-  // tidak mungkin ambigu.
+  // tidak mungkin ambigu. Nominal mutasi sudah ditafsirkan tunggal oleh
+  // provider, sehingga satu pembayaran hanya punya satu kemungkinan pasangan.
   const byAmount = new Map();
   for (const inv of pending) byAmount.set(Number(inv.payable_amount), inv);
 
   for (const tx of transactions) {
-    // Nominal mentah dicoba lebih dulu; fallback satuan minor dicatat sumbernya
-    // agar hasil pencocokan tetap bisa diaudit belakangan.
-    for (let i = 0; i < tx.amountCandidates.length; i++) {
-      const invoice = byAmount.get(tx.amountCandidates[i]);
-      if (!invoice) continue;
+    const invoice = byAmount.get(tx.amount);
+    if (!invoice) continue;
 
-      const paid = await markPaid(pool, {
-        invoiceId: invoice.id,
-        provider: providerId,
-        transaction: { ...tx, amount: tx.amountCandidates[i] },
-        amountSource: i === 0 ? 'RAW' : 'MINOR_UNIT',
-      });
-      if (paid) {
-        stats.matched++;
-        byAmount.delete(tx.amountCandidates[i]);
-        log(`invoice ${invoice.id} lunas oleh mutasi ${tx.providerTransactionId}` +
-            (i > 0 ? ' (nominal dibaca sebagai satuan minor)' : ''));
+    const paid = await markPaid(pool, {
+      invoiceId: invoice.id,
+      provider: providerId,
+      transaction: tx,
+      amountSource: tx.amountScale === 1 ? 'RAW' : 'MINOR_UNIT',
+    });
+    if (!paid) continue;
 
-        // Tanpa ini pelunasan berhenti di database dan aplikasi klien tidak
-        // pernah tahu. Jalur webhook masuk (gobiz, mayar) sudah melakukannya;
-        // jalur polling terlewat, sehingga provider tanpa webhook mendeteksi
-        // pembayaran tapi tidak memberitahukannya — kegagalan yang paling
-        // terasa justru di sisi pembeli yang pesanannya tak kunjung aktif.
-        if (paid.callback_url) {
-          try {
-            await enqueue(pool, { invoiceId: paid.id, url: paid.callback_url, event: 'invoice.paid' });
-          } catch (err) {
-            stats.errors.push(`gagal mengantrikan webhook ${paid.id}: ${err.message}`);
-            log(`gagal mengantrikan webhook untuk ${paid.id}: ${err.message}`);
-          }
-        }
+    stats.matched++;
+    byAmount.delete(tx.amount);
+    log(`invoice ${invoice.id} lunas oleh mutasi ${tx.providerTransactionId} (Rp${tx.amount})`);
+
+    // Tanpa ini pelunasan berhenti di database dan aplikasi klien tidak pernah
+    // tahu. Jalur webhook masuk sudah melakukannya; jalur polling terlewat.
+    if (paid.callback_url) {
+      try {
+        await enqueue(pool, { invoiceId: paid.id, url: paid.callback_url, event: 'invoice.paid' });
+      } catch (err) {
+        stats.errors.push(`gagal mengantrikan webhook ${paid.id}: ${err.message}`);
+        log(`gagal mengantrikan webhook untuk ${paid.id}: ${err.message}`);
       }
-      break;
     }
   }
   return stats;

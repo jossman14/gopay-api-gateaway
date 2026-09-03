@@ -3,7 +3,7 @@
 const { SessionManager } = require('./session');
 const { buildHeaders } = require('./goid');
 const { generateDynamicQRIS } = require('../../lib/qris');
-const { rawProviderAmount, providerAmountCandidates } = require('../../lib/providerAmount');
+const { rawProviderAmount, providerAmount } = require('../../lib/providerAmount');
 
 const TRANSACTIONS_URL =
   'https://api.gojekapi.com/merchant-analytics/v2/merchants/transactions';
@@ -25,7 +25,8 @@ const TRANSACTIONS_URL =
 class GopayProvider {
   static id = 'gopay';
 
-  constructor({ http, sessionStore, deviceId, qrisStatic, unique, log = null }) {
+  constructor({ http, sessionStore, deviceId, qrisStatic, unique, amountScale = 100, log = null }) {
+    this.amountScale = amountScale;
     this.http = http;
     this.qrisStatic = qrisStatic;
     this.unique = unique;
@@ -95,25 +96,30 @@ class GopayProvider {
       throw new Error(`GoPay merchant-analytics gagal (HTTP ${res.status})${detail ? ': ' + detail : ''}`);
     }
     const list = res.data?.data?.transactions ?? res.data?.transactions ?? res.data?.data ?? [];
-    return (Array.isArray(list) ? list : []).map(normalizeTransaction).filter(Boolean);
+    return (Array.isArray(list) ? list : [])
+      .map((t) => normalizeTransaction(t, this.amountScale))
+      .filter(Boolean);
   }
 }
 
 /**
  * Menyeragamkan bentuk mutasi.
  *
- * Merchant Analytics kadang mengembalikan IDR dalam satuan minor (Rp11 terbaca
- * 1100). Kedua tafsir dibawa serta agar pencocokan bisa mencoba nominal mentah
- * lebih dulu lalu fallback, dan hasilnya tetap bisa diaudit.
+ * Nominal ditafsirkan sekali dengan skala yang ditetapkan, bukan ditawarkan
+ * sebagai beberapa kemungkinan. Mutasi yang nominalnya tidak masuk akal pada
+ * skala itu dibuang daripada dicocokkan dengan tafsir lain.
  */
-function normalizeTransaction(tx) {
+function normalizeTransaction(tx, scale = 100) {
   if (!tx) return null;
   const id = tx.id ?? tx.transaction_id ?? tx.reference_id ?? null;
   if (!id) return null;
+  const amount = providerAmount(tx, scale);
+  if (amount === null) return null;
   return {
     providerTransactionId: String(id),
-    amountCandidates: providerAmountCandidates(tx),
+    amount,
     amountRaw: rawProviderAmount(tx),
+    amountScale: scale,
     transactionTime: tx.transaction_time ?? tx.created_at ?? tx.time ?? null,
     reference: tx.reference ?? tx.merchant_reference ?? null,
     raw: tx,

@@ -290,8 +290,12 @@ function buildAdminRoutes({ pool, runtime }) {
       const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
       const list = await registry().get('gopay').listTransactions({ limit });
       res.json({ success: true, data: { count: list.length, transactions: list.map((t) => ({
-        id: t.providerTransactionId, amount_candidates: t.amountCandidates,
-        amount_raw: t.amountRaw, transaction_time: t.transactionTime, reference: t.reference,
+        id: t.providerTransactionId,
+        amount: t.amount,
+        amount_raw: t.amountRaw,
+        amount_scale: t.amountScale,
+        transaction_time: t.transactionTime,
+        reference: t.reference,
       })) } });
     } catch (err) { next(err); }
   });

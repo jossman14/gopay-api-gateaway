@@ -624,7 +624,7 @@ $('txLive').onclick=async()=>{
     $('txLiveList').innerHTML=d.count?table(
       '<th>ID mutasi</th><th class="num">Nominal terbaca</th><th>Waktu</th>',
       d.transactions.map(t=>`<tr><td class="mono">${t.id}</td>
-        <td class="num">${t.amount_candidates.map(a=>rp(a)).join(' / ')}</td>
+        <td class="num">${rp(t.amount)}<br><span style="font-size:11px;color:var(--muted)">dilaporkan ${t.amount_raw} ÷ ${t.amount_scale}</span></td>
         <td class="mono">${t.transaction_time||'—'}</td></tr>`),'')
       :'<p class="empty">Tidak ada mutasi dalam 24 jam terakhir.</p>';
     msg($('txMsg'),`${d.count} mutasi ditarik dari GoPay.`,true);
@@ -761,7 +761,7 @@ $('sTx').onclick=async()=>{
     const d=await api('/hehehe/api/gopay/transactions?limit=20');
     $('txBox').innerHTML=d.count?table('<th>ID mutasi</th><th class="num">Nominal terbaca</th><th>Waktu</th>',
       d.transactions.map(t=>`<tr><td class="mono">${t.id}</td>
-        <td class="num">${t.amount_candidates.map(a=>'Rp'+a.toLocaleString('id-ID')).join(' / ')}</td>
+        <td class="num">${rp(t.amount)}</td>
         <td class="mono">${t.transaction_time||'—'}</td></tr>`),'')
       :'<p class="empty">Tidak ada mutasi terbaca.</p>';
     msg($('sessMsg'),`${d.count} mutasi terbaca dari GoPay.`,true);
