@@ -153,6 +153,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
       <a href="#inv" data-v="inv">Invoice</a>
       <a href="#clients" data-v="clients">Aplikasi</a>
       <a href="#provider" data-v="provider">Provider</a>
+      <a href="#tx" data-v="tx">Transaksi</a>
       <a href="#qris" data-v="qris">Uji QRIS</a>
       <a href="#settings" data-v="settings">Pengaturan</a>
     </nav>
@@ -256,6 +257,22 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
       </div>
     </section>
 
+    <section data-view="tx" class="hidden">
+      <div class="card">
+        <div class="head"><div><h2>Mutasi tercatat gateway</h2>
+          <p class="hint">Mutasi yang sudah diklaim invoice. Satu mutasi hanya bisa dipakai sekali.</p></div>
+          <button class="btn sm" id="txReload">Muat ulang</button></div>
+        <div id="txList"></div>
+      </div>
+      <div class="card">
+        <div class="head"><div><h2>Mutasi langsung dari GoPay</h2>
+          <p class="hint">Ditarik dari akun merchant lewat sesi OTP. Termasuk yang belum diklaim invoice mana pun.</p></div>
+          <button class="btn sm" id="txLive">Tarik dari GoPay</button></div>
+        <div id="txLiveList"><p class="empty">Belum ditarik.</p></div>
+        <div id="txMsg" class="msg"></div>
+      </div>
+    </section>
+
     <section data-view="qris" class="hidden">
       <div class="grid2">
         <div>
@@ -273,7 +290,11 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
             <div class="row">
               <button class="btn" id="qCheck">Periksa</button>
               <button class="btn ghost" id="qPreview">Buat QR percobaan</button>
+              <button class="btn ghost" id="qLive">Uji bayar sungguhan</button>
             </div>
+            <p class="hint" style="margin-top:10px">"Uji bayar sungguhan" membuat invoice uji
+              memakai jalur pencocokan yang sesungguhnya, lalu memantau sampai pembayaranmu
+              terdeteksi. Ditandai sebagai data uji dan tidak masuk laporan pemasukan.</p>
             <div id="qMsg" class="msg"></div>
           </div>
           <div class="card" id="qResultCard" style="display:none">
@@ -325,7 +346,7 @@ const ICONS={
  gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
  doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>'};
 document.querySelectorAll('nav a').forEach(a=>{
-  const m={dash:'home',inv:'list',clients:'users',provider:'plug',qris:'qr',settings:'gear'}[a.dataset.v];
+  const m={dash:'home',inv:'list',tx:'money',clients:'users',provider:'plug',qris:'qr',settings:'gear'}[a.dataset.v];
   a.innerHTML=ICONS[m]+a.textContent.trim();
 });
 
@@ -374,6 +395,7 @@ document.querySelectorAll('nav a').forEach(a=>a.onclick=e=>{
   $('subtitle').textContent={dash:'Ringkasan pemasukan seluruh aplikasi.',
     inv:'Setiap tagihan yang pernah dibuat.',clients:'Aplikasi yang memakai gateway ini.',
     provider:'Jalur pembayaran dan sesi.',
+    tx:'Mutasi masuk dan invoice yang mengklaimnya.',
     qris:'Periksa payload QRIS sebelum dipakai.',
     settings:'Seluruh konfigurasi gateway.'}[v];
 });
@@ -447,6 +469,7 @@ async function boot(){
 
   loadSettings().catch(()=>{});
   loadSession().catch(()=>{});
+  loadTx().catch(()=>{});
 
   const inv=await api('/hehehe/api/invoices?limit=100').catch(()=>({invoices:[]}));
   const rows=(inv.invoices||[]).map(i=>`<tr>
@@ -577,7 +600,78 @@ async function testProv(id){
   catch(e){msg($('provMsg'),e.message,false);}
 }
 
+// ── Transaksi ──
+async function loadTx(){
+  try{
+    const d=await api('/hehehe/api/transactions');
+    $('txList').innerHTML=table(
+      '<th>ID mutasi</th><th class="num">Nominal</th><th>Dipakai invoice</th><th>Aplikasi</th><th>Waktu klaim</th>',
+      d.transactions.map(t=>`<tr>
+        <td class="mono">${t.provider_transaction_id}</td>
+        <td class="num">${rp(t.amount)}${t.amount_source==='MINOR_UNIT'?' <span class="pill p-EXPIRED">satuan minor</span>':''}</td>
+        <td class="mono">${t.order_id||'—'}${t.is_test?' <span class="pill p-EXPIRED">uji</span>':''}</td>
+        <td>${t.client_name||'—'}</td>
+        <td class="mono">${new Date(t.claimed_at).toLocaleString('id-ID',{dateStyle:'short',timeStyle:'short'})}</td></tr>`),
+      'Belum ada mutasi yang diklaim.');
+  }catch(e){$('txList').innerHTML=`<p class="empty">${e.message}</p>`;}
+}
+$('txReload').onclick=loadTx;
+
+$('txLive').onclick=async()=>{
+  $('txLive').disabled=true;
+  try{
+    const d=await api('/hehehe/api/gopay/transactions?limit=30');
+    $('txLiveList').innerHTML=d.count?table(
+      '<th>ID mutasi</th><th class="num">Nominal terbaca</th><th>Waktu</th>',
+      d.transactions.map(t=>`<tr><td class="mono">${t.id}</td>
+        <td class="num">${t.amount_candidates.map(a=>rp(a)).join(' / ')}</td>
+        <td class="mono">${t.transaction_time||'—'}</td></tr>`),'')
+      :'<p class="empty">Tidak ada mutasi dalam 24 jam terakhir.</p>';
+    msg($('txMsg'),`${d.count} mutasi ditarik dari GoPay.`,true);
+  }catch(e){msg($('txMsg'),e.message,false);}
+  finally{$('txLive').disabled=false;}
+};
+
 // ── Uji QRIS ──
+let qPoll=null;
+function stopPoll(){ if(qPoll){clearInterval(qPoll);qPoll=null;} }
+
+function paidModal(inv){
+  openModal(`<h3 style="color:var(--ok)">✓ Pembayaran diterima</h3>
+    <p class="hint">Terdeteksi otomatis oleh rekonsiliasi — tanpa aksi manual.</p>
+    <div class="kv"><span>Nominal</span><span><b>${rp(inv.payable_amount)}</b></span></div>
+    <div class="kv"><span>Order</span><span class="mono">${inv.order_id}</span></div>
+    <div class="kv"><span>ID mutasi GoPay</span><span class="mono" style="font-size:11px">${inv.provider_transaction_id||'—'}</span></div>
+    <div class="kv"><span>Waktu lunas</span><span>${inv.paid_at?new Date(inv.paid_at).toLocaleString('id-ID'):'—'}</span></div>
+    ${inv.amount_source==='MINOR_UNIT'?'<div class="kv"><span>Catatan</span><span>nominal dibaca sebagai satuan minor</span></div>':''}
+    <div class="row"><button class="btn" id="pClose">Tutup</button></div>`);
+  $('pClose').onclick=()=>{closeModal();boot();loadTx();};
+}
+
+$('qLive').onclick=async()=>{
+  stopPoll();
+  const amt=Number($('qAmount').value)||1000;
+  $('qLive').disabled=true;
+  try{
+    const d=await api('/hehehe/api/qris/test-invoice',{method:'POST',
+      body:JSON.stringify({payload:$('qPayload').value.trim()||undefined, amount:amt})});
+    qLast={payload:d.qris,caption:rp(amt),sub:'Pindai untuk menguji'};
+    qShow('square');
+    msg($('qMsg'),`Invoice uji dibuat. Pindai QR di kanan dan bayar ${rp(amt)}. Memantau tiap 5 detik...`,true);
+
+    let elapsed=0;
+    qPoll=setInterval(async()=>{
+      elapsed+=5;
+      try{
+        const inv=await api('/hehehe/api/qris/test-invoice/'+d.invoice.id);
+        if(inv.status==='PAID'){ stopPoll(); paidModal(inv); msg($('qMsg'),'Pembayaran terdeteksi.',true); return; }
+        if(inv.status!=='PENDING'){ stopPoll(); msg($('qMsg'),`Invoice berakhir dengan status ${inv.status}.`,false); return; }
+        msg($('qMsg'),`Menunggu pembayaran ${rp(amt)}... (${elapsed} detik). Jeda deteksi sampai 20 detik.`,true);
+      }catch(e){ stopPoll(); msg($('qMsg'),e.message,false); }
+    },5000);
+  }catch(e){msg($('qMsg'),e.message,false);}
+  finally{$('qLive').disabled=false;}
+};
 let qLast=null;
 function qShow(shape){
   if(!qLast)return;

@@ -371,6 +371,101 @@ function buildAdminRoutes({ pool, runtime }) {
     } catch (err) { next(err); }
   });
 
+  /**
+   * Membuat invoice UJI dari payload QRIS yang sedang diperiksa.
+   *
+   * Sengaja memakai jalur pencocokan yang sesungguhnya — bukan pratinjau —
+   * supaya yang diuji benar-benar rantai lengkapnya: bayar, rekonsiliasi
+   * menemukan mutasinya, invoice jadi PAID. Ditandai is_test agar tidak
+   * mencemari laporan pemasukan.
+   */
+  router.post('/qris/test-invoice', async (req, res, next) => {
+    try {
+      const payload = req.body?.payload || config().providers.gopay.qrisStatic;
+      const amount = Number(req.body?.amount);
+      if (!Number.isSafeInteger(amount) || amount <= 0) {
+        return res.status(400).json({ success: false, errors: [{ message: 'amount harus bilangan bulat positif' }] });
+      }
+      const source = qrisInspect.inspect(payload);
+      if (!source.is_static) {
+        return res.status(400).json({ success: false, errors: [{ message: 'Payload harus QRIS statis merchant.' }] });
+      }
+
+      const { rows: cl } = await pool.query('SELECT id FROM clients WHERE active = TRUE ORDER BY created_at LIMIT 1');
+      if (!cl[0]) return res.status(400).json({ success: false, errors: [{ message: 'Belum ada aplikasi aktif' }] });
+
+      const id = `inv_uji_${Date.now().toString(36)}`;
+      const reference = `UJI-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+      const { dynamic } = qrisInspect.preview(payload, amount, reference);
+
+      const { rows } = await pool.query(
+        `INSERT INTO invoices (id, client_id, order_id, provider, merchant_reference,
+           base_amount, unique_code, payable_amount, status, qris_payload, expires_at, is_test, metadata)
+         VALUES ($1,$2,$3,'gopay',$4,$5,0,$5,'PENDING',$6, now() + interval '20 minutes', TRUE, '{"created_via":"uji-qris"}')
+         RETURNING *`,
+        [id, cl[0].id, `UJI-QRIS-${id}`, reference, amount, dynamic]
+      );
+      res.status(201).json({ success: true, data: { invoice: present(rows[0]), qris: dynamic } });
+    } catch (err) {
+      // Nominal yang sama dengan invoice PENDING lain ditolak database; itu
+      // invarian yang sama yang melindungi transaksi sungguhan.
+      if (err.code === '23505') {
+        return res.status(409).json({ success: false, errors: [{ message: 'Sudah ada invoice PENDING dengan nominal itu. Pakai nominal lain.' }] });
+      }
+      next(err);
+    }
+  });
+
+  /** Status satu invoice uji — dipoll konsol sambil menunggu pembayaran. */
+  router.get('/qris/test-invoice/:id', async (req, res, next) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT i.*, pt.provider_transaction_id, pt.amount AS matched_amount, pt.amount_source
+         FROM invoices i LEFT JOIN provider_transactions pt ON pt.invoice_id = i.id
+         WHERE i.id = $1`, [req.params.id]
+      );
+      if (!rows[0]) return res.status(404).json({ success: false, errors: [{ message: 'Invoice uji tidak ditemukan' }] });
+      const r = rows[0];
+      res.json({ success: true, data: {
+        ...present(r),
+        provider_transaction_id: r.provider_transaction_id ?? null,
+        matched_amount: r.matched_amount ? Number(r.matched_amount) : null,
+        amount_source: r.amount_source ?? null,
+      } });
+    } catch (err) { next(err); }
+  });
+
+  /**
+   * Mutasi provider yang tercatat gateway, digabung dengan invoice yang
+   * mengklaimnya. Berbeda dari /gopay/transactions yang menarik langsung dari
+   * GoPay, di sini terlihat mana yang sudah terpakai dan mana yang menganggur.
+   */
+  router.get('/transactions', async (req, res, next) => {
+    try {
+      const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50));
+      const { rows } = await pool.query(
+        `SELECT pt.*, i.order_id, i.client_id, i.status AS invoice_status, i.is_test, c.name AS client_name
+         FROM provider_transactions pt
+         LEFT JOIN invoices i ON i.id = pt.invoice_id
+         LEFT JOIN clients  c ON c.id = i.client_id
+         ORDER BY pt.claimed_at DESC LIMIT $1`, [limit]
+      );
+      res.json({ success: true, data: { transactions: rows.map((r) => ({
+        provider: r.provider,
+        provider_transaction_id: r.provider_transaction_id,
+        amount: Number(r.amount),
+        amount_source: r.amount_source,
+        transaction_time: r.transaction_time,
+        claimed_at: r.claimed_at,
+        invoice_id: r.invoice_id,
+        order_id: r.order_id,
+        client_name: r.client_name,
+        invoice_status: r.invoice_status,
+        is_test: r.is_test,
+      })) } });
+    } catch (err) { next(err); }
+  });
+
   router.get('/providers', (req, res) => {
     res.json({
       success: true,
