@@ -1,6 +1,7 @@
 'use strict';
 
 const express = require('express');
+const path = require('path');
 const { apiKeyAuth, adminAuth } = require('./middleware/auth');
 const { notFound, errorHandler } = require('./middleware/errors');
 const { buildV1Routes } = require('./routes/v1');
@@ -30,6 +31,14 @@ function buildApp({ pool, registry, config, log = console.log }) {
 
   app.use('/v1', apiKeyAuth(pool), buildV1Routes({ pool, registry, config }));
   app.use('/admin/api', adminAuth(config), buildAdminRoutes({ pool, registry, config }));
+
+  // Konsol admin. Halamannya statis dan tidak memuat rahasia apa pun: token
+  // dimasukkan pengguna dan disimpan di localStorage browser masing-masing,
+  // lalu dikirim sebagai header X-Admin-Token pada tiap panggilan. Karena itu
+  // aman disajikan tanpa autentikasi — yang dijaga adalah /admin/api di atas.
+  app.use('/admin', express.static(path.join(__dirname, '..', '..', 'public'), {
+    index: 'index.html', maxAge: '5m',
+  }));
 
   app.use(notFound);
   app.use(errorHandler(log));

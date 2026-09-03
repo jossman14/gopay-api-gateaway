@@ -10,6 +10,7 @@ ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY src ./src
+COPY public ./public
 
 # Gateway ini tidak menulis apa pun ke disk: seluruh state ada di PostgreSQL,
 # termasuk sesi provider. Karena itu tidak ada volume dan tidak perlu chown.
