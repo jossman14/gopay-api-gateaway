@@ -8,12 +8,17 @@ function notFound(req, res) {
 function errorHandler(log) {
   // eslint-disable-next-line no-unused-vars
   return (err, req, res, _next) => {
-    const status = err.statusCode || 500;
-    // Detail internal tidak pernah dibocorkan ke pemanggil; hanya dicatat.
-    if (status >= 500) log(`ERROR ${req.method} ${req.path}: ${err.stack || err.message}`);
+    // statusCode yang diset sengaja berarti pesannya memang untuk dibaca
+    // pemanggil. Galat tanpa statusCode adalah yang tak terduga: dicatat penuh,
+    // tapi hanya pesan umum yang keluar agar detail internal tidak bocor.
+    const deliberate = Number.isInteger(err.statusCode);
+    const status = deliberate ? err.statusCode : 500;
+    if (!deliberate || status >= 500) {
+      log(`ERROR ${req.method} ${req.path}: ${err.stack || err.message}`);
+    }
     res.status(status).json({
       success: false,
-      errors: [{ message: status >= 500 ? 'Terjadi kesalahan internal' : err.message }],
+      errors: [{ message: deliberate ? err.message : 'Terjadi kesalahan internal' }],
     });
   };
 }
