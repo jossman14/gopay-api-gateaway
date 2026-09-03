@@ -90,6 +90,13 @@ function buildApp({ pool, runtime, log = console.log }) {
   // Konsol admin. Halamannya statis dan tidak memuat rahasia: kredensial
   // dimasukkan pengguna dan ditukar dengan cookie sesi HttpOnly, sehingga token
   // tidak bisa dibaca skrip pihak ketiga di halaman.
+  // Dokumentasi integrasi disajikan apa adanya sebagai Markdown. Konsol
+  // menautkannya sehingga panduannya selalu sedekat kredensialnya.
+  app.get('/hehehe/docs', (req, res) => {
+    res.type('text/markdown; charset=utf-8')
+      .sendFile(path.join(__dirname, '..', '..', 'docs', 'INTEGRASI.md'));
+  });
+
   app.use('/hehehe', express.static(path.join(__dirname, '..', '..', 'public'), {
     index: 'index.html', maxAge: '5m',
   }));

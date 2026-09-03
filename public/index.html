@@ -170,6 +170,13 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 
     <section data-view="dash">
       <div class="tiles" id="tiles"></div>
+      <div class="card" id="reconCard">
+        <div class="head"><div><h2>Uang masuk vs tercatat</h2>
+          <p class="hint">Membandingkan mutasi di akun merchant dengan yang berhasil dikaitkan ke pesanan.
+            Selisihnya adalah pembayaran yang diterima tapi belum terhubung ke tagihan mana pun.</p></div></div>
+        <div id="recon"><p class="empty">Memuat…</p></div>
+      </div>
+
       <div class="grid2">
         <div>
           <div class="card">
@@ -465,6 +472,7 @@ async function boot(){
     tile('doc','v-pink',Object.values(st).reduce((a,b)=>a+b,0),'Total invoice');
 
   $('chart').innerHTML=chart(rev.daily||[]);
+  loadRecon().catch(()=>{});
 
   $('byClient').innerHTML=table('<th>Aplikasi</th><th class="num">Lunas</th><th class="num">Pemasukan</th>',
     (rev.by_client||[]).map(c=>`<tr><td>${c.name}</td><td class="num">${c.paid_count}</td>
@@ -485,6 +493,7 @@ async function boot(){
       <td class="mono">${c.api_key_prefix}</td>
       <td><span class="pill ${c.active?'p-PAID':'p-EXPIRED'}">${c.active?'aktif':'nonaktif'}</span></td>
       <td class="act">
+        <button class="ib" onclick="guideClient('${c.id}',${JSON.stringify(c.callback_url||'')})">Panduan</button>
         <button class="ib" onclick="editClient('${c.id}',${JSON.stringify(c.name)},${JSON.stringify(c.callback_url||'')},${c.active})">Ubah</button>
         <button class="ib danger" onclick="delClient('${c.id}')">Hapus</button></td></tr>`),
     'Belum ada aplikasi terdaftar.');
@@ -578,6 +587,70 @@ async function delClient(id){
   catch(e){alert(e.message);}
 }
 
+/**
+ * Panduan integrasi per aplikasi.
+ *
+ * Kunci API TIDAK ditampilkan di sini — ia hanya muncul sekali saat dibuat atau
+ * diputar. Cuplikan memakai placeholder agar panduan ini aman dibuka kapan pun
+ * tanpa membocorkan kredensial ke layar.
+ */
+function guideClient(id, cb){
+  const base='https://bayar.nusawangsa.com';
+  const wh=cb||'https://aplikasimu.com/webhook/bayar';
+  const buat=`const res = await fetch('${base}/v1/invoices', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': process.env.BAYAR_API_KEY,   // kunci aplikasi "${id}"
+  },
+  body: JSON.stringify({
+    order_id: 'INV-2026-0001',   // nomor pesanan milikmu
+    amount: 50000,
+    callback_url: '${wh}',
+  }),
+});
+const { data } = await res.json();
+// Tagihkan data.invoice.payable_amount, BUKAN amount.
+// Selisihnya kode unik yang dipakai untuk mengenali pembayaran.`;
+
+  const verif=`const crypto = require('crypto');
+
+// rawBody harus body MENTAH, bukan hasil parse lalu diserialisasi ulang.
+function verifikasi(secret, rawBody, header) {
+  const b = Object.fromEntries(header.split(',').map(p => p.split('=')));
+  const ts = Number(b.t);
+  if (!Number.isFinite(ts) || Math.abs(Date.now()/1000 - ts) > 300) return false;
+  const harap = crypto.createHmac('sha256', secret)
+    .update(\`\${ts}.\${rawBody}\`).digest('hex');
+  const x = Buffer.from(harap, 'hex');
+  const y = Buffer.from(b.v1 || '', 'hex');
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}`;
+
+  openModal(`<h3>Integrasi — ${id}</h3>
+    <p class="hint">Kunci API tidak ditampilkan di sini; ia hanya muncul sekali saat dibuat atau diputar.</p>
+
+    <h3 style="font-size:13px;margin:16px 0 6px">1 · Buat tagihan</h3>
+    <pre class="keybox" style="white-space:pre-wrap;font-size:11.5px;line-height:1.5">${buat.replace(/</g,'&lt;')}</pre>
+
+    <h3 style="font-size:13px;margin:16px 0 6px">2 · Verifikasi webhook</h3>
+    <p class="hint" style="margin:0 0 8px">Tanpa ini siapa pun yang menebak URL callback bisa menandai pesanan lunas.</p>
+    <pre class="keybox" style="white-space:pre-wrap;font-size:11.5px;line-height:1.5">${verif.replace(/</g,'&lt;')}</pre>
+
+    <h3 style="font-size:13px;margin:16px 0 6px">3 · Bila webhook terlewat</h3>
+    <div class="kv"><span>Cek status</span><span class="mono" style="font-size:11px">GET /v1/invoices/by-order/{orderId}</span></div>
+    <div class="kv"><span>Kirim ulang</span><span class="mono" style="font-size:11px">POST /v1/invoices/{id}/replay-webhook</span></div>
+    <div class="kv"><span>Laporan</span><span class="mono" style="font-size:11px">GET /v1/reports/revenue</span></div>
+
+    <div class="row">
+      <button class="btn" id="gCopy">Salin contoh</button>
+      <button class="btn ghost" onclick="window.open('${base}/hehehe/docs','_blank')">Dokumentasi lengkap</button>
+      <button class="btn ghost" id="gClose">Tutup</button>
+    </div>`);
+  $('gClose').onclick=closeModal;
+  $('gCopy').onclick=function(){ navigator.clipboard.writeText(buat).then(()=>this.textContent='Tersalin'); };
+}
+
 // ── CRUD invoice ──
 $('newInv').onclick=async()=>{
   const cls=await api('/hehehe/api/clients');
@@ -621,6 +694,31 @@ async function testProv(id){
   try{const d=await api('/hehehe/api/providers/'+id+'/test',{method:'POST'});
     msg($('provMsg'),`${id}: ${d.detail}`,d.ok);}
   catch(e){msg($('provMsg'),e.message,false);}
+}
+
+// ── Rekonsiliasi: uang masuk vs tercatat ──
+async function loadRecon(){
+  try{
+    const d=await api('/hehehe/api/reconciliation/summary?days=30');
+    const m=d.merchant;
+    if(!m){ $('recon').innerHTML='<p class="empty">Provider gopay tidak aktif.</p>'; return; }
+    if(m.error){ $('recon').innerHTML=`<p class="empty">Tidak bisa membaca mutasi merchant: ${m.error}</p>`; return; }
+    const bt=d.belum_terkait||{count:0,amount:0};
+    const adaSelisih=bt.count>0||bt.amount>0;
+    $('recon').innerHTML=`
+      <div class="tiles" style="margin:0">
+        ${tile('money','v-green',rp(m.settled_amount),`Diterima merchant · ${m.settled_count} mutasi`)}
+        ${tile('check','v-violet',rp(d.diklaim.amount),`Terkait pesanan · ${d.diklaim.count} mutasi`)}
+        ${tile('clock',adaSelisih?'v-amber':'v-green',rp(bt.amount),`Belum terkait · ${bt.count} mutasi`)}
+        ${tile('doc','v-pink',m.unsettled_count,'Tidak diterima (batal/kedaluwarsa)')}
+      </div>
+      ${adaSelisih?`<p class="hint" style="margin-top:14px">
+        Ada <b>${rp(bt.amount)}</b> dari ${bt.count} mutasi yang masuk ke merchant tapi tidak
+        terhubung ke tagihan mana pun — biasanya pembayaran di luar gateway, atau tagihan yang
+        sudah kedaluwarsa saat pembeli membayar.</p>`
+        :'<p class="hint" style="margin-top:14px">Seluruh uang yang diterima sudah terkait pesanan.</p>'}
+      <p class="hint">Rentang 30 hari terakhir.</p>`;
+  }catch(e){ $('recon').innerHTML=`<p class="empty">${e.message}</p>`; }
 }
 
 // ── QRIS terkonfigurasi ──

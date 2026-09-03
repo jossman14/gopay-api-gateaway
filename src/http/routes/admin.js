@@ -185,6 +185,57 @@ function buildAdminRoutes({ pool, runtime }) {
     }
   });
 
+  /**
+   * Ringkasan rekonsiliasi: uang yang masuk ke merchant versus uang yang
+   * berhasil dikaitkan ke pesanan.
+   *
+   * Selisih keduanya adalah angka yang paling perlu dilihat pemilik. Ledger
+   * yang hanya melaporkan miliknya sendiri akan tampak rapi meski ada
+   * pembayaran masuk yang tidak pernah terhubung ke pesanan mana pun.
+   */
+  router.get('/reconciliation/summary', async (req, res, next) => {
+    try {
+      const days = Math.min(365, Math.max(1, parseInt(req.query.days, 10) || 30));
+      const since = new Date(Date.now() - days * 24 * 3600_000).toISOString();
+
+      const { rows } = await pool.query(
+        `SELECT count(*)::int AS n, coalesce(sum(amount),0)::bigint AS total
+         FROM provider_transactions
+         WHERE provider = 'gopay' AND claimed_at >= $1`, [since]
+      );
+      const diklaim = { count: rows[0].n, amount: Number(rows[0].total) };
+
+      let merchant = null;
+      if (registry().has('gopay')) {
+        try {
+          const list = await registry().get('gopay').listTransactions({
+            limit: 100, windowHours: days * 24, statuses: null, paymentTypes: null,
+          });
+          const settled = list.filter((t) => t.settled);
+          merchant = {
+            total_count: list.length,
+            settled_count: settled.length,
+            settled_amount: settled.reduce((a, t) => a + t.amount, 0),
+            unsettled_count: list.length - settled.length,
+          };
+        } catch (err) {
+          merchant = { error: err.message };
+        }
+      }
+
+      res.json({ success: true, data: {
+        days,
+        merchant,
+        diklaim,
+        // Uang yang benar-benar diterima tapi belum terkait pesanan mana pun.
+        belum_terkait: merchant && !merchant.error
+          ? { count: merchant.settled_count - diklaim.count,
+              amount: merchant.settled_amount - diklaim.amount }
+          : null,
+      } });
+    } catch (err) { next(err); }
+  });
+
   /** Pandangan pemasukan gabungan — inti dari "master". */
   router.get('/reports/revenue', async (req, res, next) => {
     try {
