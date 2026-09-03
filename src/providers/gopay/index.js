@@ -43,7 +43,12 @@ class GopayProvider {
    * payload EMVCo, jadi nominal dan reference ditanamkan sendiri.
    */
   async createCharge({ orderId, amount, reference }) {
-    if (!this.qrisStatic) throw new Error('QRIS_STATIC belum diisi; adapter gopay tidak bisa membuat QRIS');
+    if (!this.qrisStatic) {
+      throw Object.assign(
+        new Error('QRIS_STATIC belum diisi; adapter gopay tidak bisa membuat QRIS'),
+        { statusCode: 503 }
+      );
+    }
     const qris = generateDynamicQRIS(this.qrisStatic, amount, reference);
     return {
       providerTransactionId: null, // baru diketahui setelah mutasi cocok

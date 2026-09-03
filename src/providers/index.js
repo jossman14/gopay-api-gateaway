@@ -43,9 +43,15 @@ function buildRegistry(cfg, { http, sessionStore } = {}) {
     ids() { return [...registry.keys()]; },
     default() {
       const id = PREFERENCE.find((p) => registry.has(p));
-      if (!id) throw new Error('Tidak ada provider aktif');
+      if (!id) {
+        throw Object.assign(
+          new Error('Belum ada provider pembayaran yang dikonfigurasi. Isi kredensial GOBIZ, MAYAR, atau GOPAY.'),
+          { statusCode: 503 }
+        );
+      }
       return registry.get(id);
     },
+    isEmpty() { return registry.size === 0; },
   };
 }
 

@@ -91,15 +91,26 @@ function load(env = process.env) {
       if (!cfg.providers.gobiz[k]) throw new Error(`GOBIZ_ENABLED=true tapi GOBIZ_${k.replace(/([A-Z])/g, '_$1').toUpperCase()} kosong`);
     }
   }
-  if (cfg.providers.gopay.enabled && !cfg.providers.gopay.deviceId) {
-    throw new Error('GOPAY_ENABLED=true tapi GOPAY_DEVICE_ID kosong (pakai UUID tetap per instalasi)');
+  if (cfg.providers.gopay.enabled) {
+    if (!cfg.providers.gopay.deviceId) {
+      throw new Error('GOPAY_ENABLED=true tapi GOPAY_DEVICE_ID kosong (pakai UUID tetap per instalasi)');
+    }
+    // Tanpa QRIS statis merchant, adapter ini tidak bisa membuat QR sama sekali.
+    // Lebih baik ketahuan saat start daripada saat transaksi pertama.
+    if (!cfg.providers.gopay.qrisStatic) {
+      throw new Error('GOPAY_ENABLED=true tapi QRIS_STATIC kosong (payload QRIS statis merchant)');
+    }
   }
   if (cfg.providers.mayar.enabled && !cfg.providers.mayar.apiKey) {
     throw new Error('MAYAR_ENABLED=true tapi MAYAR_API_KEY kosong');
   }
-  if (!cfg.providers.gobiz.enabled && !cfg.providers.gopay.enabled && !cfg.providers.mayar.enabled) {
-    throw new Error('Tidak ada provider yang diaktifkan; gateway tidak bisa menerima pembayaran');
-  }
+  // Nol provider BUKAN galat. Gateway ini ledger master lebih dulu: laporan,
+  // pendaftaran klien, dan konsol admin tetap berguna sebelum provider mana pun
+  // terpasang. Pembuatan invoice yang menolak dengan pesan jelas (503) lebih
+  // baik daripada proses yang menolak terbit sama sekali.
+  cfg.hasProvider = cfg.providers.gobiz.enabled
+    || cfg.providers.gopay.enabled
+    || cfg.providers.mayar.enabled;
 
   return cfg;
 }

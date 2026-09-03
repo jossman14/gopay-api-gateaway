@@ -22,7 +22,12 @@ async function main() {
   await migrate(pool, log);
 
   const registry = buildRegistry(config, { http: httpClient, sessionStore: new SessionStore(pool) });
-  log(`provider aktif: ${registry.ids().join(', ')} (default: ${registry.default().constructor.id})`);
+  if (registry.isEmpty()) {
+    log('PERINGATAN: belum ada provider pembayaran. Laporan dan konsol tetap jalan, ' +
+        'pembuatan invoice akan menolak sampai kredensial diisi.');
+  } else {
+    log(`provider aktif: ${registry.ids().join(', ')} (default: ${registry.default().constructor.id})`);
+  }
 
   const app = buildApp({ pool, registry, config, log });
   const server = app.listen(config.port, () => log(`gateway mendengarkan di :${config.port}`));
