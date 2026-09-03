@@ -4,6 +4,7 @@ const express = require('express');
 const clients = require('../../domain/clients');
 const reports = require('../../domain/reports');
 const { reconcileOnce } = require('../../domain/reconcile');
+const { present } = require('./v1');
 
 /**
  * Rute admin — pandangan master lintas seluruh aplikasi.
@@ -13,6 +14,11 @@ const { reconcileOnce } = require('../../domain/reconcile');
  */
 function buildAdminRoutes({ pool, registry, config }) {
   const router = express.Router();
+
+  /** Siapa yang sedang login — dipakai konsol untuk memutuskan tampilan. */
+  router.get('/session', (req, res) => {
+    res.json({ success: true, data: { via: req.admin?.via, email: req.admin?.email ?? null } });
+  });
 
   router.get('/clients', async (req, res, next) => {
     try { res.json({ success: true, data: { clients: await clients.listClients(pool) } }); }
@@ -45,6 +51,30 @@ function buildAdminRoutes({ pool, registry, config }) {
       const out = await clients.rotateApiKey(pool, req.params.id);
       if (!out) return res.status(404).json({ success: false, errors: [{ message: 'Klien tidak ditemukan' }] });
       res.json({ success: true, data: out, note: 'Kunci lama langsung tidak berlaku.' });
+    } catch (err) { next(err); }
+  });
+
+  /**
+   * Seluruh invoice lintas aplikasi.
+   *
+   * Berbeda dari /v1/invoices yang selalu dibatasi satu klien, di sini justru
+   * gabungannya — itulah gunanya pandangan master. Nama aplikasi ikut di-join
+   * agar konsol tidak perlu memanggil dua kali.
+   */
+  router.get('/invoices', async (req, res, next) => {
+    try {
+      const limit = Math.min(500, Math.max(1, parseInt(req.query.limit, 10) || 100));
+      const status = req.query.status || null;
+      const { rows } = await pool.query(
+        `SELECT i.*, c.name AS client_name
+         FROM invoices i JOIN clients c ON c.id = i.client_id
+         WHERE ($1::text IS NULL OR i.status = $1)
+         ORDER BY i.created_at DESC LIMIT $2`,
+        [status, limit]
+      );
+      res.json({ success: true, data: { invoices: rows.map((r) => ({
+        ...present(r), client_id: r.client_id, client_name: r.client_name,
+      })) } });
     } catch (err) { next(err); }
   });
 

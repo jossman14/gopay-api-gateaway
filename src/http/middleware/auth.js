@@ -1,6 +1,8 @@
 'use strict';
 
+const crypto = require('crypto');
 const { authenticate } = require('../../domain/clients');
+const { verifySession } = require('../../domain/adminAuth');
 
 /**
  * Autentikasi klien lewat header X-API-Key.
@@ -26,18 +28,47 @@ function apiKeyAuth(pool) {
   };
 }
 
-/** Admin dashboard. Dimatikan bila kredensial belum diatur — bukan diberi default. */
+/**
+ * Admin. Menerima dua bentuk kredensial:
+ *
+ *   1. Cookie/header sesi hasil login email+kata sandi — untuk manusia.
+ *   2. X-Admin-Token, secret mentah — untuk skrip dan otomasi.
+ *
+ * Keduanya dibandingkan dengan timingSafeEqual. Bila secret belum diatur,
+ * seluruh permukaan admin dimatikan alih-alih diberi kredensial default.
+ */
 function adminAuth(config) {
   return (req, res, next) => {
-    if (!config.admin.sessionSecret) {
+    const secret = config.admin.sessionSecret;
+    if (!secret) {
       return res.status(503).json({ success: false, errors: [{ message: 'Dashboard admin tidak dikonfigurasi' }] });
     }
-    const token = req.headers['x-admin-token'];
-    if (!token || token !== config.admin.sessionSecret) {
-      return res.status(401).json({ success: false, errors: [{ message: 'Token admin tidak valid' }] });
-    }
-    next();
+
+    const raw = req.headers['x-admin-token'];
+    if (raw && safeEqual(raw, secret)) { req.admin = { via: 'token' }; return next(); }
+
+    const session = req.headers['x-admin-session'] || readCookie(req, 'pg_session');
+    const claims = session ? verifySession(secret, session) : null;
+    if (claims) { req.admin = { via: 'session', email: claims.email }; return next(); }
+
+    res.status(401).json({ success: false, errors: [{ message: 'Perlu login admin' }] });
   };
 }
 
-module.exports = { apiKeyAuth, adminAuth };
+function safeEqual(a, b) {
+  const x = Buffer.from(String(a));
+  const y = Buffer.from(String(b));
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+
+function readCookie(req, name) {
+  const raw = req.headers.cookie;
+  if (!raw) return null;
+  for (const part of raw.split(';')) {
+    const [k, ...v] = part.trim().split('=');
+    if (k === name) return decodeURIComponent(v.join('='));
+  }
+  return null;
+}
+
+module.exports = { apiKeyAuth, adminAuth, readCookie };

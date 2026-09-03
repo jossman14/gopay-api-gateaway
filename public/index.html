@@ -3,209 +3,388 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Payments Gateway — Konsol</title>
+<title>Payments — Konsol</title>
 <style>
-  :root {
-    --bg: #f6f7f9; --surface: #fff; --line: #e3e6ea; --ink: #14181f;
-    --muted: #667085; --accent: #1f6feb; --ok: #10794a; --bad: #b42318;
-    --radius: 10px;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#12151a; --surface:#1a1f27; --line:#2a3038; --ink:#e8eaed;
-            --muted:#9aa4b2; --accent:#4c8dff; --ok:#3ecf8e; --bad:#ff6b6b; }
-  }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink);
-         font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
-  .wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
-  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
-  .sub { color: var(--muted); margin: 0 0 28px; font-size: 14px; }
-  .card { background:var(--surface); border:1px solid var(--line);
-          border-radius:var(--radius); padding:20px; margin-bottom:16px; }
-  .card h2 { font-size:15px; margin:0 0 14px; font-weight:600; }
-  label { display:block; font-size:13px; color:var(--muted); margin:12px 0 5px; }
-  input { width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:7px;
-          background:var(--bg); color:var(--ink); font:inherit; }
-  input:focus { outline:2px solid var(--accent); outline-offset:1px; border-color:transparent; }
-  button { margin-top:14px; padding:9px 16px; border:0; border-radius:7px; background:var(--accent);
-           color:#fff; font:inherit; font-weight:500; cursor:pointer; }
-  button:disabled { opacity:.5; cursor:not-allowed; }
-  button.ghost { background:transparent; color:var(--muted); border:1px solid var(--line); }
-  .row { display:flex; gap:10px; flex-wrap:wrap; }
-  .msg { margin-top:14px; padding:10px 12px; border-radius:7px; font-size:14px; display:none; }
-  .msg.show { display:block; }
-  .msg.ok { background:color-mix(in srgb,var(--ok) 12%,transparent); color:var(--ok); }
-  .msg.bad { background:color-mix(in srgb,var(--bad) 12%,transparent); color:var(--bad); }
-  .steps { display:flex; gap:8px; margin-bottom:18px; font-size:13px; color:var(--muted); }
-  .steps span { padding:3px 10px; border-radius:99px; border:1px solid var(--line); }
-  .steps span.on { border-color:var(--accent); color:var(--accent); font-weight:500; }
-  table { width:100%; border-collapse:collapse; font-size:14px; }
-  th,td { text-align:left; padding:7px 6px; border-bottom:1px solid var(--line); }
-  th { color:var(--muted); font-weight:500; font-size:12px; text-transform:uppercase;
-       letter-spacing:.04em; }
-  td.num { text-align:right; font-variant-numeric:tabular-nums; }
-  .hidden { display:none; }
-  code { background:var(--bg); padding:1px 5px; border-radius:4px; font-size:13px; }
-  .note { font-size:13px; color:var(--muted); margin-top:10px; }
+:root{
+  --bg:#f4f2fb; --card:#fff; --ink:#1e1b33; --muted:#8b88a3; --line:#eceaf5;
+  --violet:#7c5cff; --violet-soft:#efeaff;
+  --green:#2bb673; --green-soft:#e3f7ee;
+  --amber:#f0a92e; --amber-soft:#fdf1dc;
+  --pink:#ef5da8; --pink-soft:#fde8f2;
+  --r:18px; --shadow:0 1px 2px rgba(30,27,51,.04),0 8px 24px -12px rgba(30,27,51,.14);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif}
+button{font:inherit;cursor:pointer;border:0}
+input{font:inherit}
+
+/* ── Login ─────────────────────────────────────────────── */
+#login{min-height:100vh;display:grid;place-items:center;padding:24px}
+.loginCard{background:var(--card);border-radius:24px;box-shadow:var(--shadow);
+  padding:36px 32px;width:100%;max-width:390px}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:26px}
+.logo{width:38px;height:38px;border-radius:12px;background:var(--violet);
+  display:grid;place-items:center;color:#fff;font-weight:700;font-size:17px}
+.brand b{font-size:18px;letter-spacing:-.02em}
+.loginCard h1{font-size:19px;margin:0 0 4px;letter-spacing:-.01em}
+.loginCard p.sub{color:var(--muted);margin:0 0 22px;font-size:13.5px}
+label{display:block;font-size:12.5px;color:var(--muted);margin:14px 0 6px;font-weight:500}
+.field{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:12px;
+  background:#fbfaff;color:var(--ink);transition:border-color .15s,box-shadow .15s}
+.field:focus{outline:0;border-color:var(--violet);box-shadow:0 0 0 3px var(--violet-soft)}
+.btn{background:var(--violet);color:#fff;padding:11px 18px;border-radius:12px;font-weight:600;
+  transition:filter .15s}
+.btn:hover:not(:disabled){filter:brightness(1.07)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn.wide{width:100%;margin-top:20px}
+.btn.ghost{background:var(--violet-soft);color:var(--violet)}
+.btn.sm{padding:7px 13px;border-radius:10px;font-size:13px}
+.msg{margin-top:14px;padding:10px 12px;border-radius:11px;font-size:13px;display:none}
+.msg.show{display:block}
+.msg.ok{background:var(--green-soft);color:#177a4c}
+.msg.bad{background:var(--pink-soft);color:#c02b6f}
+
+/* ── Kerangka aplikasi ─────────────────────────────────── */
+#app{display:none;min-height:100vh;padding:18px;gap:18px;grid-template-columns:224px 1fr}
+#app.on{display:grid}
+aside{background:var(--card);border-radius:22px;box-shadow:var(--shadow);padding:22px 16px;
+  height:calc(100vh - 36px);position:sticky;top:18px;display:flex;flex-direction:column}
+nav{margin-top:22px;display:flex;flex-direction:column;gap:4px}
+nav a{display:flex;align-items:center;gap:11px;padding:10px 13px;border-radius:13px;
+  color:var(--muted);text-decoration:none;font-weight:500;transition:.15s}
+nav a:hover{background:#faf9ff;color:var(--ink)}
+nav a.on{background:var(--violet-soft);color:var(--violet);font-weight:600}
+nav a svg{width:17px;height:17px;flex:none}
+.spacer{flex:1}
+.who{font-size:12px;color:var(--muted);padding:0 4px 10px;word-break:break-all}
+
+main{min-width:0;padding-bottom:24px}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}
+header.top h1{font-size:23px;margin:0 0 3px;letter-spacing:-.02em}
+header.top p{margin:0;color:var(--muted);font-size:13.5px}
+
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:14px;margin-bottom:18px}
+.tile{background:var(--card);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);
+  display:flex;gap:13px;align-items:center}
+.tile .ico{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex:none}
+.tile .ico svg{width:21px;height:21px}
+.tile .v{font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.15}
+.tile .k{font-size:12.5px;color:var(--muted)}
+.v-violet{background:var(--violet-soft);color:var(--violet)}
+.v-green{background:var(--green-soft);color:var(--green)}
+.v-amber{background:var(--amber-soft);color:var(--amber)}
+.v-pink{background:var(--pink-soft);color:var(--pink)}
+
+.grid2{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
+@media(max-width:1000px){.grid2{grid-template-columns:1fr}#app{grid-template-columns:1fr}
+  aside{height:auto;position:static}}
+
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:20px;margin-bottom:18px}
+.card h2{font-size:15.5px;margin:0 0 3px;letter-spacing:-.01em}
+.card .hint{color:var(--muted);font-size:12.5px;margin:0 0 16px}
+.card h2+table,.card h2+.body{margin-top:16px}
+
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);font-size:13.5px}
+th{color:var(--muted);font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+tbody tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11.5px;font-weight:600}
+.p-PENDING{background:var(--amber-soft);color:#a9700d}
+.p-PAID{background:var(--green-soft);color:#177a4c}
+.p-EXPIRED{background:#f1f0f6;color:var(--muted)}
+.p-CANCELLED,.p-FAILED{background:var(--pink-soft);color:#c02b6f}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+
+.bars{display:flex;align-items:flex-end;gap:9px;height:132px;margin-top:6px}
+.bars .b{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:7px}
+.bars .fill{width:100%;border-radius:8px 8px 4px 4px;background:linear-gradient(180deg,#a08bff,#7c5cff);min-height:3px}
+.bars .lb{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.empty{color:var(--muted);font-size:13px;padding:14px 0}
+
+.steps{display:flex;gap:7px;margin-bottom:16px;flex-wrap:wrap}
+.steps span{padding:4px 11px;border-radius:99px;background:#f7f6fc;color:var(--muted);font-size:12px}
+.steps span.on{background:var(--violet-soft);color:var(--violet);font-weight:600}
+.row{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+.hidden{display:none!important}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.kv:last-child{border-bottom:0}
+.kv span:first-child{color:var(--muted)}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Payments Gateway</h1>
-  <p class="sub">Konsol admin. Token disimpan di browser ini saja, tidak pernah dikirim ke mana pun selain gateway.</p>
 
-  <div class="card">
-    <h2>Token admin</h2>
-    <label for="tok">X-Admin-Token</label>
-    <input id="tok" type="password" placeholder="tempel token admin" autocomplete="off">
-    <div class="row">
-      <button id="save">Simpan &amp; sambungkan</button>
-      <button id="forget" class="ghost">Lupakan</button>
-    </div>
-    <div id="tokMsg" class="msg"></div>
-  </div>
-
-  <div class="card" id="otpCard">
-    <h2>Login GoPay lewat OTP</h2>
-    <div class="steps">
-      <span id="s1" class="on">1 · Nomor HP</span>
-      <span id="s2">2 · Kode OTP</span>
-      <span id="s3">3 · Selesai</span>
-    </div>
-
-    <div id="step1">
-      <label for="phone">Nomor HP GoBiz</label>
-      <input id="phone" inputmode="numeric" placeholder="081234567890" autocomplete="tel">
-      <button id="reqOtp">Kirim OTP</button>
-      <p class="note">OTP dikirim via SMS atau WhatsApp ke nomor merchant.</p>
-    </div>
-
-    <div id="step2" class="hidden">
-      <label for="otp">Kode OTP</label>
-      <input id="otp" inputmode="numeric" maxlength="6" placeholder="1234" autocomplete="one-time-code">
-      <div class="row">
-        <button id="verify">Verifikasi</button>
-        <button id="back" class="ghost">Ganti nomor</button>
-      </div>
-    </div>
-
-    <div id="otpMsg" class="msg"></div>
-  </div>
-
-  <div class="card">
-    <h2>Pemasukan seluruh aplikasi</h2>
-    <div id="revBody"><p class="note">Sambungkan token untuk memuat.</p></div>
+<!-- ── Login ───────────────────────────────────────────── -->
+<div id="login">
+  <div class="loginCard">
+    <div class="brand"><div class="logo">₽</div><b>Payments</b></div>
+    <h1>Masuk</h1>
+    <p class="sub">Konsol admin gateway pembayaran.</p>
+    <form id="loginForm">
+      <label for="email">Email</label>
+      <input id="email" class="field" type="email" autocomplete="username" placeholder="admin@hehe.com">
+      <label for="pass">Kata sandi</label>
+      <input id="pass" class="field" type="password" autocomplete="current-password" placeholder="••••••••">
+      <button class="btn wide" id="loginBtn" type="submit">Masuk</button>
+    </form>
+    <div id="loginMsg" class="msg"></div>
   </div>
 </div>
 
+<!-- ── Aplikasi ────────────────────────────────────────── -->
+<div id="app">
+  <aside>
+    <div class="brand"><div class="logo">₽</div><b>Payments</b></div>
+    <nav>
+      <a href="#dash" class="on" data-v="dash">Dashboard</a>
+      <a href="#inv" data-v="inv">Invoice</a>
+      <a href="#clients" data-v="clients">Aplikasi</a>
+      <a href="#provider" data-v="provider">Provider</a>
+    </nav>
+    <div class="spacer"></div>
+    <div class="who" id="who"></div>
+    <button class="btn ghost sm" id="logout">Keluar</button>
+  </aside>
+
+  <main>
+    <header class="top">
+      <div><h1 id="greet">Dashboard</h1><p id="subtitle">Ringkasan pemasukan seluruh aplikasi.</p></div>
+      <button class="btn sm" id="refresh">Muat ulang</button>
+    </header>
+
+    <section data-view="dash">
+      <div class="tiles" id="tiles"></div>
+      <div class="grid2">
+        <div>
+          <div class="card">
+            <h2>Pemasukan harian</h2>
+            <p class="hint">Hanya invoice berstatus PAID yang dihitung.</p>
+            <div id="chart"></div>
+          </div>
+          <div class="card">
+            <h2>Invoice terakhir</h2>
+            <p class="hint">Seluruh aplikasi.</p>
+            <div id="recent"></div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <h2>Per aplikasi</h2>
+            <p class="hint">Pemasukan yang sudah lunas.</p>
+            <div id="byClient"></div>
+          </div>
+          <div class="card">
+            <h2>Per provider</h2>
+            <div id="byProvider"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section data-view="inv" class="hidden">
+      <div class="card"><h2>Seluruh invoice</h2><div id="invoices"></div></div>
+    </section>
+
+    <section data-view="clients" class="hidden">
+      <div class="card"><h2>Aplikasi terdaftar</h2>
+        <p class="hint">Kunci API hanya muncul sekali saat dibuat atau diputar.</p>
+        <div id="clients"></div>
+      </div>
+    </section>
+
+    <section data-view="provider" class="hidden">
+      <div class="card">
+        <h2>Provider aktif</h2><div id="providers"></div>
+      </div>
+      <div class="card">
+        <h2>Login GoPay lewat OTP</h2>
+        <p class="hint">Diperlukan agar rekonsiliasi bisa menarik mutasi. Tanpa sesi, pelunasan tidak akan pernah terdeteksi.</p>
+        <div class="steps"><span id="s1" class="on">1 · Nomor HP</span><span id="s2">2 · Kode OTP</span><span id="s3">3 · Selesai</span></div>
+        <div id="step1">
+          <label for="phone">Nomor HP GoBiz</label>
+          <input id="phone" class="field" inputmode="numeric" placeholder="081234567890">
+          <div class="row"><button class="btn sm" id="reqOtp">Kirim OTP</button></div>
+        </div>
+        <div id="step2" class="hidden">
+          <label for="otp">Kode OTP</label>
+          <input id="otp" class="field" inputmode="numeric" maxlength="6" placeholder="1234">
+          <div class="row"><button class="btn sm" id="verify">Verifikasi</button>
+            <button class="btn ghost sm" id="back">Ganti nomor</button></div>
+        </div>
+        <div id="otpMsg" class="msg"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
 <script>
-const $ = (id) => document.getElementById(id);
-const KEY = 'pg_admin_token';
-let token = localStorage.getItem(KEY) || '';
-if (token) $('tok').value = token;
+const ICONS={
+ home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>',
+ list:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+ users:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>',
+ plug:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0z"/><path d="M12 18v4"/></svg>',
+ money:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+ check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5.5 5.5L20 7"/></svg>',
+ clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+ doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>'};
+document.querySelectorAll('nav a').forEach(a=>{
+  const m={dash:'home',inv:'list',clients:'users',provider:'plug'}[a.dataset.v];
+  a.innerHTML=ICONS[m]+a.textContent.trim();
+});
 
-function msg(el, text, ok) {
-  el.textContent = text;
-  el.className = 'msg show ' + (ok ? 'ok' : 'bad');
-}
-function clearMsg(el) { el.className = 'msg'; }
+const $=id=>document.getElementById(id);
+const rp=n=>'Rp'+Number(n||0).toLocaleString('id-ID');
+function msg(el,t,ok){el.textContent=t;el.className='msg show '+(ok?'ok':'bad');}
 
-async function api(path, opts = {}) {
-  const res = await fetch(path, {
-    ...opts,
-    headers: { 'content-type': 'application/json', 'x-admin-token': token, ...(opts.headers || {}) },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok || body.success === false) {
-    throw new Error(body?.errors?.[0]?.message || `HTTP ${res.status}`);
-  }
-  return body.data;
-}
-
-$('save').onclick = async () => {
-  token = $('tok').value.trim();
-  if (!token) return msg($('tokMsg'), 'Token masih kosong.', false);
-  try {
-    const d = await api('/admin/api/providers');
-    localStorage.setItem(KEY, token);
-    msg($('tokMsg'), `Tersambung. Provider aktif: ${d.active.join(', ')}.`, true);
-    loadRevenue();
-  } catch (e) { msg($('tokMsg'), e.message, false); }
-};
-
-$('forget').onclick = () => {
-  localStorage.removeItem(KEY); token = ''; $('tok').value = '';
-  msg($('tokMsg'), 'Token dihapus dari browser ini.', true);
-};
-
-let otpToken = null;
-
-$('reqOtp').onclick = async () => {
-  const phone = $('phone').value.trim();
-  if (!phone) return msg($('otpMsg'), 'Nomor HP masih kosong.', false);
-  $('reqOtp').disabled = true;
-  clearMsg($('otpMsg'));
-  try {
-    const d = await api('/admin/api/gopay/login/request', {
-      method: 'POST', body: JSON.stringify({ phone_number: phone }),
-    });
-    otpToken = d.otp_token;
-    $('step1').classList.add('hidden');
-    $('step2').classList.remove('hidden');
-    $('s1').classList.remove('on'); $('s2').classList.add('on');
-    $('otp').maxLength = d.otp_length || 6;
-    $('otp').focus();
-    msg($('otpMsg'), `OTP dikirim ke ${phone}. Masukkan ${d.otp_length || 4} digit.`, true);
-  } catch (e) { msg($('otpMsg'), e.message, false); }
-  finally { $('reqOtp').disabled = false; }
-};
-
-$('back').onclick = () => {
-  otpToken = null;
-  $('step2').classList.add('hidden'); $('step1').classList.remove('hidden');
-  $('s2').classList.remove('on'); $('s1').classList.add('on');
-  clearMsg($('otpMsg'));
-};
-
-$('verify').onclick = async () => {
-  const otp = $('otp').value.trim();
-  if (!otp) return msg($('otpMsg'), 'Kode OTP masih kosong.', false);
-  $('verify').disabled = true;
-  try {
-    const d = await api('/admin/api/gopay/login/verify', {
-      method: 'POST',
-      body: JSON.stringify({ phone_number: $('phone').value.trim(), otp_token: otpToken, otp }),
-    });
-    $('s2').classList.remove('on'); $('s3').classList.add('on');
-    $('step2').classList.add('hidden');
-    msg($('otpMsg'),
-      `Sesi tersimpan. Outlet: ${d.outletName || '—'}. Token berlaku sampai ${new Date(d.expiresAt).toLocaleString('id-ID')}. Sesi diperbarui otomatis, tidak perlu login lagi.`,
-      true);
-  } catch (e) { msg($('otpMsg'), e.message, false); }
-  finally { $('verify').disabled = false; }
-};
-
-function rupiah(n) { return 'Rp' + Number(n || 0).toLocaleString('id-ID'); }
-
-async function loadRevenue() {
-  if (!token) return;
-  try {
-    const d = await api('/admin/api/reports/revenue');
-    const rows = d.by_client.map((c) =>
-      `<tr><td>${c.name}</td><td class="num">${c.paid_count}</td><td class="num">${rupiah(c.gross_amount)}</td></tr>`
-    ).join('');
-    $('revBody').innerHTML = `
-      <table>
-        <thead><tr><th>Aplikasi</th><th class="num">Lunas</th><th class="num">Pemasukan</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="3">Belum ada pembayaran.</td></tr>'}</tbody>
-        <tfoot><tr><th>Total</th><th class="num"></th><th class="num">${rupiah(d.total_gross_amount)}</th></tr></tfoot>
-      </table>`;
-  } catch (e) {
-    $('revBody').innerHTML = `<p class="note">Gagal memuat: ${e.message}</p>`;
-  }
+async function api(path,opts={}){
+  const res=await fetch(path,{credentials:'same-origin',
+    headers:{'content-type':'application/json',...(opts.headers||{})},...opts});
+  const b=await res.json().catch(()=>({}));
+  if(res.status===401){show(false);throw new Error('Sesi berakhir, silakan masuk lagi.');}
+  if(!res.ok||b.success===false)throw new Error(b?.errors?.[0]?.message||('HTTP '+res.status));
+  return b.data;
 }
 
-if (token) { $('save').click(); }
+function show(loggedIn){
+  $('login').style.display=loggedIn?'none':'grid';
+  $('app').classList.toggle('on',loggedIn);
+}
+
+$('loginForm').onsubmit=async e=>{
+  e.preventDefault();
+  $('loginBtn').disabled=true;
+  try{
+    await api('/hehehe/api/login',{method:'POST',
+      body:JSON.stringify({email:$('email').value.trim(),password:$('pass').value})});
+    $('pass').value='';
+    show(true); boot();
+  }catch(err){msg($('loginMsg'),err.message,false);}
+  finally{$('loginBtn').disabled=false;}
+};
+
+$('logout').onclick=async()=>{
+  await fetch('/hehehe/api/logout',{method:'POST',credentials:'same-origin'});
+  show(false);
+};
+
+document.querySelectorAll('nav a').forEach(a=>a.onclick=e=>{
+  e.preventDefault();
+  document.querySelectorAll('nav a').forEach(x=>x.classList.remove('on'));
+  a.classList.add('on');
+  const v=a.dataset.v;
+  document.querySelectorAll('section[data-view]').forEach(s=>s.classList.toggle('hidden',s.dataset.view!==v));
+  $('greet').textContent=a.textContent.trim();
+  $('subtitle').textContent={dash:'Ringkasan pemasukan seluruh aplikasi.',
+    inv:'Setiap tagihan yang pernah dibuat.',clients:'Aplikasi yang memakai gateway ini.',
+    provider:'Jalur pembayaran dan sesi.'}[v];
+});
+
+$('refresh').onclick=boot;
+
+function tile(ico,cls,val,key){
+  return `<div class="tile"><div class="ico ${cls}">${ICONS[ico]}</div>
+    <div><div class="v">${val}</div><div class="k">${key}</div></div></div>`;
+}
+
+function table(head,rows,empty){
+  if(!rows.length)return `<p class="empty">${empty}</p>`;
+  return `<table><thead><tr>${head}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
+}
+
+function chart(daily){
+  if(!daily.length)return '<p class="empty">Belum ada pembayaran lunas.</p>';
+  const max=Math.max(...daily.map(d=>d.gross_amount),1);
+  return '<div class="bars">'+daily.slice(-14).map(d=>{
+    const h=Math.round((d.gross_amount/max)*104);
+    const day=new Date(d.day).toLocaleDateString('id-ID',{day:'numeric',month:'short'});
+    return `<div class="b" title="${day}: ${rp(d.gross_amount)}">
+      <div class="fill" style="height:${h}px"></div><div class="lb">${day.split(' ')[0]}</div></div>`;
+  }).join('')+'</div>';
+}
+
+async function boot(){
+  try{
+    const me=await api('/hehehe/api/session');
+    $('who').textContent=me.email||('token: '+me.via);
+  }catch{ return; }
+
+  const [rev,provs,cls]=await Promise.all([
+    api('/hehehe/api/reports/revenue'),
+    api('/hehehe/api/providers'),
+    api('/hehehe/api/clients'),
+  ]);
+
+  const st=rev.status||{};
+  $('tiles').innerHTML=
+    tile('money','v-violet',rp(rev.total_gross_amount),'Total pemasukan')+
+    tile('check','v-green',st.PAID||0,'Lunas')+
+    tile('clock','v-amber',st.PENDING||0,'Menunggu bayar')+
+    tile('doc','v-pink',Object.values(st).reduce((a,b)=>a+b,0),'Total invoice');
+
+  $('chart').innerHTML=chart(rev.daily||[]);
+
+  $('byClient').innerHTML=table('<th>Aplikasi</th><th class="num">Lunas</th><th class="num">Pemasukan</th>',
+    (rev.by_client||[]).map(c=>`<tr><td>${c.name}</td><td class="num">${c.paid_count}</td>
+      <td class="num">${rp(c.gross_amount)}</td></tr>`),'Belum ada aplikasi.');
+
+  $('byProvider').innerHTML=table('<th>Provider</th><th class="num">Lunas</th><th class="num">Nilai</th>',
+    (rev.by_provider||[]).map(p=>`<tr><td class="mono">${p.provider}</td><td class="num">${p.paid_count}</td>
+      <td class="num">${rp(p.gross_amount)}</td></tr>`),'Belum ada pembayaran lunas.');
+
+  $('providers').innerHTML=(provs.detail||[]).map(p=>`
+    <div class="kv"><span>${p.id}${p.id===provs.default?' · default':''}</span>
+    <span>${p.supports_webhook?'webhook':'polling'}${p.needs_unique_amount?' · nominal unik':''}</span></div>`).join('')
+    ||'<p class="empty">Belum ada provider dikonfigurasi.</p>';
+
+  $('clients').innerHTML=table('<th>Aplikasi</th><th>ID</th><th>Prefix kunci</th><th>Callback</th>',
+    (cls.clients||[]).map(c=>`<tr><td>${c.name}</td><td class="mono">${c.id}</td>
+      <td class="mono">${c.api_key_prefix}</td><td class="mono">${c.callback_url||'—'}</td></tr>`),
+    'Belum ada aplikasi terdaftar.');
+
+  const inv=await api('/hehehe/api/invoices?limit=100').catch(()=>({invoices:[]}));
+  const rows=(inv.invoices||[]).map(i=>`<tr>
+    <td class="mono">${i.order_id}</td><td>${i.client_name||i.client_id}</td>
+    <td><span class="pill p-${i.status}">${i.status}</span></td>
+    <td class="mono">${i.provider}</td>
+    <td class="num">${rp(i.payable_amount)}</td>
+    <td class="mono">${new Date(i.created_at).toLocaleString('id-ID',{dateStyle:'short',timeStyle:'short'})}</td></tr>`);
+  const head='<th>Order</th><th>Aplikasi</th><th>Status</th><th>Provider</th><th class="num">Nominal</th><th>Dibuat</th>';
+  $('invoices').innerHTML=table(head,rows,'Belum ada invoice.');
+  $('recent').innerHTML=table(head,rows.slice(0,6),'Belum ada invoice.');
+}
+
+// ── OTP GoPay ──
+let otpToken=null;
+$('reqOtp').onclick=async()=>{
+  $('reqOtp').disabled=true;
+  try{
+    const d=await api('/hehehe/api/gopay/login/request',{method:'POST',
+      body:JSON.stringify({phone_number:$('phone').value.trim()})});
+    otpToken=d.otp_token;
+    $('step1').classList.add('hidden');$('step2').classList.remove('hidden');
+    $('s1').classList.remove('on');$('s2').classList.add('on');
+    $('otp').maxLength=d.otp_length||6;$('otp').focus();
+    msg($('otpMsg'),`OTP dikirim. Masukkan ${d.otp_length||4} digit.`,true);
+  }catch(e){msg($('otpMsg'),e.message,false);}
+  finally{$('reqOtp').disabled=false;}
+};
+$('back').onclick=()=>{otpToken=null;
+  $('step2').classList.add('hidden');$('step1').classList.remove('hidden');
+  $('s2').classList.remove('on');$('s1').classList.add('on');};
+$('verify').onclick=async()=>{
+  $('verify').disabled=true;
+  try{
+    const d=await api('/hehehe/api/gopay/login/verify',{method:'POST',
+      body:JSON.stringify({phone_number:$('phone').value.trim(),otp_token:otpToken,otp:$('otp').value.trim()})});
+    $('s2').classList.remove('on');$('s3').classList.add('on');$('step2').classList.add('hidden');
+    msg($('otpMsg'),`Sesi tersimpan. Outlet: ${d.outletName||'—'}. Berlaku sampai ${new Date(d.expiresAt).toLocaleString('id-ID')}.`,true);
+  }catch(e){msg($('otpMsg'),e.message,false);}
+  finally{$('verify').disabled=false;}
+};
+
+// Cookie sesi HttpOnly: keberadaannya diketahui dengan mencoba, bukan dibaca.
+api('/hehehe/api/session').then(()=>{show(true);boot();}).catch(()=>show(false));
 </script>
 </body>
 </html>

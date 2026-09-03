@@ -22,7 +22,12 @@ async function reconcileOnce(pool, provider, { log = () => {} } = {}) {
   try {
     transactions = await provider.listTransactions({ limit: 100 });
   } catch (err) {
+    // Dicatat, bukan sekadar ditampung. Versi sebelumnya menaruhnya di
+    // stats.errors dan mengembalikannya diam-diam, sehingga rekonsiliasi bisa
+    // gagal tiap 20 detik tanpa satu baris pun di log — kegagalan senyap pada
+    // jalur yang justru menentukan invoice mana yang dianggap lunas.
     stats.errors.push(err.message);
+    log(`gagal menarik mutasi (${pending.length} invoice PENDING menunggu): ${err.message}`);
     return stats;
   }
   stats.seen = transactions.length;

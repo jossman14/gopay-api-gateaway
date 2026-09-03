@@ -35,7 +35,11 @@ function load(env = process.env) {
     // fitur hilang daripada terbuka dengan kredensial default.
     admin: {
       email: env.ADMIN_EMAIL || null,
-      passwordHash: env.ADMIN_PASSWORD_HASH || null,
+      // Hanya hash yang disimpan. ADMIN_PASSWORD diterima sebagai kemudahan
+      // saat pertama menyiapkan, tapi di-hash saat dimuat sehingga kata sandi
+      // terang tidak pernah tersimpan di memori proses lebih lama dari perlu.
+      passwordHash: env.ADMIN_PASSWORD_HASH
+        || (env.ADMIN_PASSWORD ? require('../domain/adminAuth').hashPassword(env.ADMIN_PASSWORD) : null),
       sessionSecret: env.ADMIN_SESSION_SECRET || null,
     },
 
