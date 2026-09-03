@@ -1,6 +1,7 @@
 'use strict';
 
 const { markPaid, expireOverdue, listPending } = require('./invoices');
+const { enqueue } = require('../webhooks/deliver');
 
 /**
  * Worker rekonsiliasi untuk provider tanpa webhook (jalur gopay).
@@ -56,6 +57,20 @@ async function reconcileOnce(pool, provider, { log = () => {} } = {}) {
         byAmount.delete(tx.amountCandidates[i]);
         log(`invoice ${invoice.id} lunas oleh mutasi ${tx.providerTransactionId}` +
             (i > 0 ? ' (nominal dibaca sebagai satuan minor)' : ''));
+
+        // Tanpa ini pelunasan berhenti di database dan aplikasi klien tidak
+        // pernah tahu. Jalur webhook masuk (gobiz, mayar) sudah melakukannya;
+        // jalur polling terlewat, sehingga provider tanpa webhook mendeteksi
+        // pembayaran tapi tidak memberitahukannya — kegagalan yang paling
+        // terasa justru di sisi pembeli yang pesanannya tak kunjung aktif.
+        if (paid.callback_url) {
+          try {
+            await enqueue(pool, { invoiceId: paid.id, url: paid.callback_url, event: 'invoice.paid' });
+          } catch (err) {
+            stats.errors.push(`gagal mengantrikan webhook ${paid.id}: ${err.message}`);
+            log(`gagal mengantrikan webhook untuk ${paid.id}: ${err.message}`);
+          }
+        }
       }
       break;
     }
