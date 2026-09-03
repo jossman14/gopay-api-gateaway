@@ -36,7 +36,14 @@ function buildRegistry(cfg, { http, sessionStore } = {}) {
   return {
     get(id) {
       const provider = registry.get(id);
-      if (!provider) throw new Error(`Provider tidak tersedia atau tidak aktif: ${id}`);
+      if (!provider) {
+        // 503, bukan 500: ini keadaan konfigurasi yang bisa diperbaiki operator,
+        // dan pesannya harus sampai ke pemanggil agar tahu apa yang kurang.
+        throw Object.assign(
+          new Error(`Provider "${id}" tidak aktif. Aktifkan lewat ${id.toUpperCase()}_ENABLED=true beserta kredensialnya.`),
+          { statusCode: 503 }
+        );
+      }
       return provider;
     },
     has(id) { return registry.has(id); },

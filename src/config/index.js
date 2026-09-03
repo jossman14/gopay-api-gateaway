@@ -95,16 +95,14 @@ function load(env = process.env) {
       if (!cfg.providers.gobiz[k]) throw new Error(`GOBIZ_ENABLED=true tapi GOBIZ_${k.replace(/([A-Z])/g, '_$1').toUpperCase()} kosong`);
     }
   }
-  if (cfg.providers.gopay.enabled) {
-    if (!cfg.providers.gopay.deviceId) {
-      throw new Error('GOPAY_ENABLED=true tapi GOPAY_DEVICE_ID kosong (pakai UUID tetap per instalasi)');
-    }
-    // Tanpa QRIS statis merchant, adapter ini tidak bisa membuat QR sama sekali.
-    // Lebih baik ketahuan saat start daripada saat transaksi pertama.
-    if (!cfg.providers.gopay.qrisStatic) {
-      throw new Error('GOPAY_ENABLED=true tapi QRIS_STATIC kosong (payload QRIS statis merchant)');
-    }
+  if (cfg.providers.gopay.enabled && !cfg.providers.gopay.deviceId) {
+    throw new Error('GOPAY_ENABLED=true tapi GOPAY_DEVICE_ID kosong (pakai UUID tetap per instalasi)');
   }
+  // QRIS_STATIC sengaja TIDAK diwajibkan di sini. Ia hanya dibutuhkan untuk
+  // membuat QR, sedangkan login OTP dan penarikan mutasi tidak memerlukannya.
+  // Mewajibkannya saat start membuat lingkaran: sesi tidak bisa dibuat sebelum
+  // konfigurasi lengkap, padahal login itu justru langkah penyiapan pertama.
+  // Ketiadaannya ditolak saat createCharge dengan 503 yang jelas.
   if (cfg.providers.mayar.enabled && !cfg.providers.mayar.apiKey) {
     throw new Error('MAYAR_ENABLED=true tapi MAYAR_API_KEY kosong');
   }
