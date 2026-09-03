@@ -58,7 +58,7 @@ class SessionManager {
   async getAccessToken(now = Date.now()) {
     const session = await this.store.load(this.provider);
     if (!session || !session.access_token) {
-      throw new Error('Sesi GoPay belum tersedia. Jalankan login OTP lewat POST /admin/api/gopay/login.');
+      throw new Error('Sesi GoPay belum tersedia. Jalankan login OTP lewat konsol di /hehehe (menu Provider).');
     }
     const expiresAt = session.expires_at ? Date.parse(session.expires_at) : 0;
     if (expiresAt - now > 5 * 60_000) return session.access_token;
