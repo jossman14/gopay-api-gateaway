@@ -153,6 +153,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
       <a href="#inv" data-v="inv">Invoice</a>
       <a href="#clients" data-v="clients">Aplikasi</a>
       <a href="#provider" data-v="provider">Provider</a>
+      <a href="#qris" data-v="qris">Uji QRIS</a>
       <a href="#settings" data-v="settings">Pengaturan</a>
     </nav>
     <div class="spacer"></div>
@@ -255,6 +256,46 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
       </div>
     </section>
 
+    <section data-view="qris" class="hidden">
+      <div class="grid2">
+        <div>
+          <div class="card">
+            <h2>Periksa payload QRIS</h2>
+            <p class="hint">Kosongkan untuk memakai QRIS_STATIC yang tersimpan di Pengaturan.
+              Payload tidak disimpan oleh pemeriksaan ini.</p>
+            <label for="qPayload">Payload QRIS statis</label>
+            <textarea id="qPayload" class="field" rows="4" placeholder="00020101021126..."
+              style="font-family:ui-monospace,Menlo,monospace;font-size:12px;resize:vertical"></textarea>
+            <label for="qAmount">Nominal percobaan (Rp)</label>
+            <input id="qAmount" class="field" type="number" value="50001">
+            <label for="qRef">Referensi</label>
+            <input id="qRef" class="field" value="UJI-QRIS">
+            <div class="row">
+              <button class="btn" id="qCheck">Periksa</button>
+              <button class="btn ghost" id="qPreview">Buat QR percobaan</button>
+            </div>
+            <div id="qMsg" class="msg"></div>
+          </div>
+          <div class="card" id="qResultCard" style="display:none">
+            <h2>Rincian tag EMVCo</h2>
+            <div id="qTags"></div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <h2>Pratinjau QR</h2>
+            <p class="hint">Pindai dengan aplikasi pembayaran sungguhan sebelum dipakai produksi.</p>
+            <div id="qImage" style="text-align:center"><p class="empty">Belum ada pratinjau.</p></div>
+            <div class="row" id="qOpts" style="display:none">
+              <button class="btn ghost sm" id="qSquare">Kotak</button>
+              <button class="btn ghost sm" id="qDot">Bulat</button>
+              <button class="btn ghost sm" id="qPlain">PNG polos</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section data-view="settings" class="hidden">
       <div class="card">
         <h2>Pengaturan</h2>
@@ -280,10 +321,11 @@ const ICONS={
  money:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5.5 5.5L20 7"/></svg>',
  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+ qr:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg>',
  gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
  doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>'};
 document.querySelectorAll('nav a').forEach(a=>{
-  const m={dash:'home',inv:'list',clients:'users',provider:'plug',settings:'gear'}[a.dataset.v];
+  const m={dash:'home',inv:'list',clients:'users',provider:'plug',qris:'qr',settings:'gear'}[a.dataset.v];
   a.innerHTML=ICONS[m]+a.textContent.trim();
 });
 
@@ -332,6 +374,7 @@ document.querySelectorAll('nav a').forEach(a=>a.onclick=e=>{
   $('subtitle').textContent={dash:'Ringkasan pemasukan seluruh aplikasi.',
     inv:'Setiap tagihan yang pernah dibuat.',clients:'Aplikasi yang memakai gateway ini.',
     provider:'Jalur pembayaran dan sesi.',
+    qris:'Periksa payload QRIS sebelum dipakai.',
     settings:'Seluruh konfigurasi gateway.'}[v];
 });
 
@@ -533,6 +576,61 @@ async function testProv(id){
     msg($('provMsg'),`${id}: ${d.detail}`,d.ok);}
   catch(e){msg($('provMsg'),e.message,false);}
 }
+
+// ── Uji QRIS ──
+let qLast=null;
+function qShow(shape){
+  if(!qLast)return;
+  const p=encodeURIComponent(qLast.payload);
+  const cap=encodeURIComponent(qLast.caption||'');
+  const sub=encodeURIComponent(qLast.sub||'');
+  const url = shape==='plain'
+    ? `/hehehe/api/qris/image?plain=1&payload=${p}`
+    : `/hehehe/api/qris/image?payload=${p}&shape=${shape}&caption=${cap}&subcaption=${sub}`;
+  $('qImage').innerHTML=`<img src="${url}" alt="QR" style="max-width:100%;width:340px">`;
+  $('qOpts').style.display='flex';
+}
+
+function renderTags(r){
+  $('qResultCard').style.display='block';
+  const rows=r.tags.map(t=>`<tr><td class="mono">${t.tag}</td><td>${t.label||'—'}</td>
+    <td class="mono">${String(t.value).replace(/</g,'&lt;')}</td></tr>`);
+  $('qTags').innerHTML=
+    `<div class="kv"><span>CRC</span><span>${r.crc_ok===true?'sah':r.crc_ok===false?'TIDAK SAH':'tidak ada'}</span></div>
+     <div class="kv"><span>Jenis</span><span>${r.is_static?'statis (siap dipakai gateway)':'dinamis'}</span></div>
+     <div class="kv"><span>Merchant</span><span>${r.merchant_name||'—'}${r.merchant_city?' · '+r.merchant_city:''}</span></div>
+     <div class="kv"><span>Mata uang</span><span>${r.currency||'—'}${r.currency==='360'?' (IDR)':''}</span></div>
+     <div class="kv"><span>Panjang payload</span><span>${r.length} karakter</span></div>`+
+    table('<th>Tag</th><th>Arti</th><th>Nilai</th>',rows,'');
+}
+
+$('qCheck').onclick=async()=>{
+  try{
+    const r=await api('/hehehe/api/qris/inspect',{method:'POST',
+      body:JSON.stringify({payload:$('qPayload').value.trim()||undefined})});
+    renderTags(r);
+    msg($('qMsg'), r.valid?'Payload sah dan berjenis statis — siap dipakai gateway.'
+      :('Masalah ditemukan: '+r.problems.join(' ')), r.valid);
+    qLast={payload:$('qPayload').value.trim(),caption:null,sub:r.merchant_name};
+    if(qLast.payload)qShow('square');
+  }catch(e){msg($('qMsg'),e.message,false);$('qResultCard').style.display='none';}
+};
+
+$('qPreview').onclick=async()=>{
+  try{
+    const amt=Number($('qAmount').value)||1000;
+    const r=await api('/hehehe/api/qris/preview',{method:'POST',
+      body:JSON.stringify({payload:$('qPayload').value.trim()||undefined,
+        amount:amt, reference:$('qRef').value.trim()||undefined})});
+    renderTags(r.dynamicInspect);
+    qLast={payload:r.dynamic,caption:'Rp'+amt.toLocaleString('id-ID'),sub:r.source.merchant_name};
+    qShow('square');
+    msg($('qMsg'),`QR dinamis dibuat. CRC ${r.dynamicInspect.crc_ok?'sah':'TIDAK SAH'}. Pindai untuk memastikan.`,r.dynamicInspect.crc_ok);
+  }catch(e){msg($('qMsg'),e.message,false);}
+};
+$('qSquare').onclick=()=>qShow('square');
+$('qDot').onclick=()=>qShow('dot');
+$('qPlain').onclick=()=>qShow('plain');
 
 // ── Sesi GoPay ──
 async function loadSession(){

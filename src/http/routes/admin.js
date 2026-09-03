@@ -6,6 +6,9 @@ const reports = require('../../domain/reports');
 const { reconcileOnce } = require('../../domain/reconcile');
 const { present } = require('./v1');
 const settings = require('../../domain/settings');
+const qrisInspect = require('../../domain/qrisInspect');
+const { renderSvg } = require('../../lib/qrImage');
+const QRCodeLib = require('qrcode');
 const invoicesDomain = require('../../domain/invoices');
 
 /**
@@ -312,6 +315,59 @@ function buildAdminRoutes({ pool, runtime }) {
         "DELETE FROM invoices WHERE is_test = TRUE AND status <> 'PAID'"
       );
       res.json({ success: true, data: { deleted: rowCount } });
+    } catch (err) { next(err); }
+  });
+
+  /**
+   * Memeriksa payload QRIS tanpa menyimpannya.
+   *
+   * Salah menempelkan QRIS statis adalah kesalahan mahal: QR-nya tetap tercetak
+   * dan tetap bisa dipindai, tapi uangnya mengalir ke merchant lain. Memeriksa
+   * lebih dulu jauh lebih murah daripada menemukannya dari pembeli.
+   */
+  router.post('/qris/inspect', (req, res, next) => {
+    try {
+      const payload = req.body?.payload || config().providers.gopay.qrisStatic;
+      res.json({ success: true, data: qrisInspect.inspect(payload) });
+    } catch (err) { next(err); }
+  });
+
+  /** Membuat QRIS dinamis percobaan dari payload statis. */
+  router.post('/qris/preview', (req, res, next) => {
+    try {
+      const payload = req.body?.payload || config().providers.gopay.qrisStatic;
+      const amount = Number(req.body?.amount) || 1000;
+      const out = qrisInspect.preview(payload, amount, req.body?.reference || 'UJI-QRIS');
+      res.json({ success: true, data: out });
+    } catch (err) { next(err); }
+  });
+
+  /**
+   * Gambar QR.
+   *
+   * `plain=1` memakai perenderan bawaan pustaka sebagai PNG. Itu jalur yang
+   * paling konservatif dan berguna sebagai pembanding bila ada pemindai yang
+   * kesulitan membaca versi bergaya.
+   */
+  router.get('/qris/image', async (req, res, next) => {
+    try {
+      const payload = req.query.payload || config().providers.gopay.qrisStatic;
+      if (!payload) return res.status(400).json({ success: false, errors: [{ message: 'Tidak ada payload QRIS' }] });
+
+      if (req.query.plain === '1') {
+        const png = await QRCodeLib.toBuffer(String(payload), {
+          errorCorrectionLevel: 'H', width: 720, margin: 4,
+        });
+        return res.type('png').set('cache-control', 'no-store').send(png);
+      }
+      const svg = renderSvg(String(payload), {
+        size: 480,
+        shape: req.query.shape === 'dot' ? 'dot' : 'square',
+        logo: req.query.logo !== '0',
+        caption: req.query.caption || null,
+        subcaption: req.query.subcaption || null,
+      });
+      res.type('image/svg+xml').set('cache-control', 'no-store').send(svg);
     } catch (err) { next(err); }
   });
 
