@@ -287,9 +287,17 @@ function buildAdminRoutes({ pool, runtime }) {
   /** Mutasi mentah dari GoPay — memperlihatkan data asli yang terbaca sesi. */
   router.get('/gopay/transactions', async (req, res, next) => {
     try {
-      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
-      const list = await registry().get('gopay').listTransactions({ limit });
-      res.json({ success: true, data: { count: list.length, transactions: list.map((t) => ({
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 100));
+      const days = Math.min(365, Math.max(1, parseInt(req.query.days, 10) || 30));
+      // Penelusuran memperlihatkan apa adanya: filter status dimatikan kecuali
+      // diminta, karena menyaringnya membuat mutasi tampak hilang.
+      const list = await registry().get('gopay').listTransactions({
+        limit,
+        windowHours: days * 24,
+        statuses: req.query.settled === '1' ? 'SETTLEMENT,CAPTURE' : null,
+        paymentTypes: req.query.types || null,
+      });
+      res.json({ success: true, data: { count: list.length, days, transactions: list.map((t) => ({
         id: t.providerTransactionId,
         amount: t.amount,
         amount_raw: t.amountRaw,

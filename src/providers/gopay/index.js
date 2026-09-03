@@ -60,13 +60,27 @@ class GopayProvider {
   }
 
   /**
-   * Mutasi merchant terbaru, dipakai worker rekonsiliasi.
+   * Mutasi merchant.
    *
-   * Merchant Analytics menolak permintaan tanpa merchant_ids dan rentang waktu
-   * (HTTP 400). merchant_id diambil dari sesi hasil login, bukan dari
-   * environment, supaya tidak ada yang perlu diisi manual sesudah OTP.
+   * Dua tujuan yang berbeda memakai filter berbeda, dan itu disengaja:
+   *
+   *   Rekonsiliasi memakai default — hanya SETTLEMENT dan CAPTURE. Melunasi
+   *   invoice dari pembayaran yang belum settle berarti menyerahkan barang atas
+   *   uang yang belum tentu masuk.
+   *
+   *   Penelusuran di konsol mematikan filter status dan memperlebar jendela,
+   *   supaya yang terlihat adalah seluruh mutasi apa adanya. Dengan filter
+   *   bawaan, transaksi yang tidak berstatus itu menghilang tanpa penjelasan —
+   *   dan itu tampak seperti data hilang, bukan hasil penyaringan.
+   *
+   * `size` dibatasi 100; di atas itu Merchant Analytics membalas HTTP 422.
    */
-  async listTransactions({ limit = 50, windowHours = 24 } = {}) {
+  async listTransactions({
+    limit = 50,
+    windowHours = 24,
+    statuses = 'SETTLEMENT,CAPTURE',
+    paymentTypes = 'QRIS,GOPAY',
+  } = {}) {
     const token = await this.session.getAccessToken();
     const merchantId = await this.session.merchantId();
     if (!merchantId) {
@@ -79,20 +93,20 @@ class GopayProvider {
     const now = new Date();
     const params = new URLSearchParams({
       from: '0',
-      size: String(limit),
-      statuses: 'SETTLEMENT,CAPTURE',
-      payment_types: 'QRIS,GOPAY',
+      size: String(Math.min(100, Math.max(1, limit))),
       start_time: new Date(now.getTime() - windowHours * 3600_000).toISOString(),
       end_time: now.toISOString(),
       merchant_ids: merchantId,
     });
+    if (statuses) params.set('statuses', statuses);
+    if (paymentTypes) params.set('payment_types', paymentTypes);
 
     const res = await this.http(`${TRANSACTIONS_URL}?${params}`, {
       method: 'GET',
       headers: buildHeaders(this.session.deviceId, { Authorization: `Bearer ${token}` }),
     });
     if (res.status < 200 || res.status >= 300) {
-      const detail = res.data?.message || res.data?.error || '';
+      const detail = res.data?.errors?.[0]?.message || res.data?.message || '';
       throw new Error(`GoPay merchant-analytics gagal (HTTP ${res.status})${detail ? ': ' + detail : ''}`);
     }
     const list = res.data?.data?.transactions ?? res.data?.transactions ?? res.data?.data ?? [];

@@ -266,8 +266,22 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
       </div>
       <div class="card">
         <div class="head"><div><h2>Mutasi langsung dari GoPay</h2>
-          <p class="hint">Ditarik dari akun merchant lewat sesi OTP. Termasuk yang belum diklaim invoice mana pun.</p></div>
-          <button class="btn sm" id="txLive">Tarik dari GoPay</button></div>
+          <p class="hint">Ditarik dari akun merchant lewat sesi OTP. Merchant Analytics membatasi
+            100 baris per tarikan, dan menyaring status akan menyembunyikan sebagian mutasi.</p></div>
+          <div class="act">
+            <select id="txDays" class="field" style="width:auto;padding:6px 10px">
+              <option value="1">1 hari</option>
+              <option value="7">7 hari</option>
+              <option value="30" selected>30 hari</option>
+              <option value="90">90 hari</option>
+              <option value="365">1 tahun</option>
+            </select>
+            <select id="txSettled" class="field" style="width:auto;padding:6px 10px">
+              <option value="0" selected>Semua mutasi</option>
+              <option value="1">Hanya yang settle</option>
+            </select>
+            <button class="btn sm" id="txLive">Tarik</button>
+          </div></div>
         <div id="txLiveList"><p class="empty">Belum ditarik.</p></div>
         <div id="txMsg" class="msg"></div>
       </div>
@@ -620,14 +634,16 @@ $('txReload').onclick=loadTx;
 $('txLive').onclick=async()=>{
   $('txLive').disabled=true;
   try{
-    const d=await api('/hehehe/api/gopay/transactions?limit=30');
+    const days=$('txDays').value, settled=$('txSettled').value;
+    const d=await api(`/hehehe/api/gopay/transactions?limit=100&days=${days}&settled=${settled}`);
     $('txLiveList').innerHTML=d.count?table(
       '<th>ID mutasi</th><th class="num">Nominal terbaca</th><th>Waktu</th>',
       d.transactions.map(t=>`<tr><td class="mono">${t.id}</td>
         <td class="num">${rp(t.amount)}<br><span style="font-size:11px;color:var(--muted)">dilaporkan ${t.amount_raw} ÷ ${t.amount_scale}</span></td>
         <td class="mono">${t.transaction_time||'—'}</td></tr>`),'')
-      :'<p class="empty">Tidak ada mutasi dalam 24 jam terakhir.</p>';
-    msg($('txMsg'),`${d.count} mutasi ditarik dari GoPay.`,true);
+      :`<p class="empty">Tidak ada mutasi dalam ${d.days} hari terakhir.</p>`;
+    msg($('txMsg'),`${d.count} mutasi dalam ${d.days} hari terakhir.`+
+      (settled==='1'?' Hanya yang berstatus settle.':' Termasuk yang belum settle.'),true);
   }catch(e){msg($('txMsg'),e.message,false);}
   finally{$('txLive').disabled=false;}
 };
