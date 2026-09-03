@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { rawProviderAmount, providerAmountCandidates } = require('../lib/providerAmount');
+const { rawProviderAmount, providerAmountCandidates } = require('../src/lib/providerAmount');
 
 test('nominal provider IDR menyediakan raw dan fallback minor-unit', () => {
     const transaction = { gross_amount: 1100, currency: 'IDR' };

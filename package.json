@@ -1,18 +1,20 @@
 {
-  "name": "gopay-merchant-gateway",
-  "version": "1.0.0",
-  "description": "GoPay Merchant Payment Gateway & QRIS Verification API (Stateless)",
-  "main": "server.js",
+  "name": "payments-master-gateway",
+  "version": "2.0.0",
+  "description": "Gateway pembayaran master: QRIS GoBiz + Mayar, ledger multi-aplikasi di PostgreSQL",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
-    "test": "node --test"
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "migrate": "node -e \"const{load}=require('./src/config');const{getPool,closePool}=require('./src/db/pool');const{migrate}=require('./src/db/migrate');(async()=>{const p=getPool(load().databaseUrl);await migrate(p);await closePool();})()\"",
+    "test": "node --test \"test/**/*.test.js\""
   },
   "dependencies": {
-    "axios": "^1.7.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.18.3",
+    "express": "^4.21.2",
+    "pg": "^8.13.1",
     "qrcode": "^1.5.4"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

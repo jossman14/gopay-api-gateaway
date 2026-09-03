@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { calculateCRC16, parseTLV, generateDynamicQRIS } = require('../lib/qris');
+const { calculateCRC16, parseTLV, generateDynamicQRIS } = require('../src/lib/qris');
 
 function staticQris() {
     const body = '0002010102115802ID5904TOKO6007JAKARTA6304';
