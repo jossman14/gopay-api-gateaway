@@ -6,6 +6,7 @@ const reports = require('../../domain/reports');
 const { reconcileOnce } = require('../../domain/reconcile');
 const { present } = require('./v1');
 const settings = require('../../domain/settings');
+const invoicesDomain = require('../../domain/invoices');
 
 /**
  * Rute admin — pandangan master lintas seluruh aplikasi.
@@ -79,6 +80,106 @@ function buildAdminRoutes({ pool, runtime }) {
         ...present(r), client_id: r.client_id, client_name: r.client_name,
       })) } });
     } catch (err) { next(err); }
+  });
+
+  /** Membuat invoice atas nama sebuah aplikasi, dari konsol. */
+  router.post('/invoices', async (req, res, next) => {
+    try {
+      const { client_id: clientId, order_id: orderId, amount, provider: providerId, callback_url: callbackUrl } = req.body || {};
+      if (!clientId || !orderId) {
+        return res.status(400).json({ success: false, errors: [{ message: 'client_id dan order_id wajib diisi' }] });
+      }
+      const { rows } = await pool.query('SELECT * FROM clients WHERE id = $1 AND active = TRUE', [clientId]);
+      if (!rows[0]) return res.status(404).json({ success: false, errors: [{ message: 'Aplikasi tidak ditemukan atau nonaktif' }] });
+
+      const provider = providerId ? registry().get(providerId) : registry().default();
+      const { invoice, created } = await invoicesDomain.createInvoice(pool, {
+        client: rows[0], orderId, amount: Number(amount), provider, callbackUrl,
+        metadata: { created_via: 'konsol' },
+        expiryMs: config().invoice.expiryMs, unique: config().invoice,
+      });
+      res.status(created ? 201 : 200).json({ success: true, data: { invoice: present(invoice), created } });
+    } catch (err) { next(err); }
+  });
+
+  router.post('/invoices/:id/cancel', async (req, res, next) => {
+    try {
+      const out = await invoicesDomain.cancelInvoice(pool, req.params.id);
+      if (!out) return res.status(404).json({ success: false, errors: [{ message: 'Invoice tidak ditemukan' }] });
+      res.json({ success: true, data: { invoice: present(out) } });
+    } catch (err) { next(err); }
+  });
+
+  router.delete('/invoices/:id', async (req, res, next) => {
+    try {
+      const ok = await invoicesDomain.deleteInvoice(pool, req.params.id);
+      if (!ok) return res.status(404).json({ success: false, errors: [{ message: 'Invoice tidak ditemukan' }] });
+      res.json({ success: true, data: {} });
+    } catch (err) { next(err); }
+  });
+
+  /** Memaksa pemeriksaan status satu invoice ke provider — tanpa menunggu polling. */
+  router.post('/invoices/:id/sync', async (req, res, next) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT i.*, pt.provider_transaction_id
+         FROM invoices i
+         LEFT JOIN provider_transactions pt ON pt.invoice_id = i.id
+         WHERE i.id = $1`, [req.params.id]
+      );
+      const inv = rows[0];
+      if (!inv) return res.status(404).json({ success: false, errors: [{ message: 'Invoice tidak ditemukan' }] });
+      const provider = registry().get(inv.provider);
+      if (typeof provider.getCharge !== 'function' || !inv.provider_transaction_id) {
+        return res.status(400).json({ success: false, errors: [{ message: `Provider ${inv.provider} tidak mendukung pemeriksaan langsung; pakai rekonsiliasi.` }] });
+      }
+      const charge = await provider.getCharge(inv.provider_transaction_id);
+      let paid = null;
+      if (charge.status === 'PAID') {
+        paid = await invoicesDomain.markPaid(pool, {
+          invoiceId: inv.id, provider: inv.provider,
+          transaction: { providerTransactionId: inv.provider_transaction_id, amount: charge.amount, raw: charge.raw },
+        });
+      }
+      res.json({ success: true, data: { provider_status: charge.status, updated: Boolean(paid) } });
+    } catch (err) { next(err); }
+  });
+
+  router.patch('/clients/:id', async (req, res, next) => {
+    try {
+      const out = await clients.updateClient(pool, req.params.id, {
+        name: req.body?.name, callbackUrl: req.body?.callback_url, active: req.body?.active,
+      });
+      if (!out) return res.status(404).json({ success: false, errors: [{ message: 'Aplikasi tidak ditemukan' }] });
+      res.json({ success: true, data: { client: out } });
+    } catch (err) { next(err); }
+  });
+
+  router.delete('/clients/:id', async (req, res, next) => {
+    try {
+      const ok = await clients.deleteClient(pool, req.params.id);
+      if (!ok) return res.status(404).json({ success: false, errors: [{ message: 'Aplikasi tidak ditemukan' }] });
+      res.json({ success: true, data: {} });
+    } catch (err) { next(err); }
+  });
+
+  /** Menguji kredensial provider tanpa membuat transaksi. */
+  router.post('/providers/:id/test', async (req, res, next) => {
+    try {
+      const provider = registry().get(req.params.id);
+      if (req.params.id === 'gopay') {
+        const list = await provider.listTransactions({ limit: 1 });
+        return res.json({ success: true, data: { ok: true, detail: `sesi sah, ${list.length} mutasi terbaca` } });
+      }
+      if (typeof provider.oauth?.getAccessToken === 'function') {
+        await provider.oauth.getAccessToken();
+        return res.json({ success: true, data: { ok: true, detail: 'token OAuth berhasil diperoleh' } });
+      }
+      const probe = await provider.getCharge('probe-nonexistent').then(() => 'terjangkau').catch((e) => e.message);
+      res.json({ success: true, data: { ok: true, detail: String(probe).slice(0, 160) } });
+    } catch (err) {
+      res.status(200).json({ success: true, data: { ok: false, detail: err.message } });
+    }
   });
 
   /** Pandangan pemasukan gabungan — inti dari "master". */

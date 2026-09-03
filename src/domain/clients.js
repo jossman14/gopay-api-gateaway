@@ -77,4 +77,40 @@ async function rotateApiKey(pool, clientId) {
   return { id: clientId, apiKey: key };
 }
 
-module.exports = { generateApiKey, hashKey, createClient, authenticate, listClients, rotateApiKey };
+/** Menyunting klien. Hanya field aman; id dan hash kunci tidak bisa diubah di sini. */
+async function updateClient(pool, id, { name, callbackUrl, active }) {
+  const { rows } = await pool.query(
+    `UPDATE clients SET
+       name         = COALESCE($2, name),
+       callback_url = COALESCE($3, callback_url),
+       active       = COALESCE($4, active)
+     WHERE id = $1
+     RETURNING id, name, api_key_prefix, callback_url, active, created_at`,
+    [id, name ?? null, callbackUrl ?? null, typeof active === 'boolean' ? active : null]
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Menghapus klien.
+ *
+ * Ditolak bila masih punya invoice: menghapusnya akan memutus catatan uang dari
+ * pemiliknya. Nonaktifkan saja — kuncinya langsung tidak berlaku sementara
+ * riwayatnya tetap utuh.
+ */
+async function deleteClient(pool, id) {
+  const { rows } = await pool.query('SELECT count(*)::int n FROM invoices WHERE client_id = $1', [id]);
+  if (rows[0].n > 0) {
+    throw Object.assign(
+      new Error(`Klien masih punya ${rows[0].n} invoice. Nonaktifkan saja agar riwayat pemasukan tidak terputus.`),
+      { statusCode: 409 }
+    );
+  }
+  const { rowCount } = await pool.query('DELETE FROM clients WHERE id = $1', [id]);
+  return rowCount > 0;
+}
+
+module.exports = {
+  generateApiKey, hashKey, createClient, authenticate, listClients,
+  rotateApiKey, updateClient, deleteClient,
+};

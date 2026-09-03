@@ -110,6 +110,18 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .hidden{display:none!important}
 .kv{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
 .kv:last-child{border-bottom:0}
+.act{display:flex;gap:6px;justify-content:flex-end}
+.ib{padding:5px 10px;border-radius:9px;font-size:12px;font-weight:600;background:#f5f4fa;color:var(--muted)}
+.ib:hover{background:var(--violet-soft);color:var(--violet)}
+.ib.danger:hover{background:var(--pink-soft);color:#c02b6f}
+.modal{position:fixed;inset:0;background:rgba(30,27,51,.34);display:none;place-items:center;padding:20px;z-index:50}
+.modal.on{display:grid}
+.modal .box{background:var(--card);border-radius:20px;padding:26px;width:100%;max-width:430px;box-shadow:0 20px 60px -20px rgba(30,27,51,.4)}
+.modal h3{margin:0 0 4px;font-size:17px}
+.modal p.hint{margin:0 0 14px}
+.keybox{background:#f7f6fc;border:1px solid var(--line);border-radius:11px;padding:11px;
+  font-family:ui-monospace,Menlo,monospace;font-size:12.5px;word-break:break-all;margin-top:10px}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:4px}
 .kv span:first-child{color:var(--muted)}
 </style>
 </head>
@@ -184,19 +196,29 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
     </section>
 
     <section data-view="inv" class="hidden">
-      <div class="card"><h2>Seluruh invoice</h2><div id="invoices"></div></div>
+      <div class="card">
+        <div class="head"><div><h2>Seluruh invoice</h2>
+          <p class="hint">Invoice PAID tidak dapat dihapus — itu catatan uang yang benar-benar masuk.</p></div>
+          <button class="btn sm" id="newInv">+ Invoice</button></div>
+        <div id="invoices"></div>
+      </div>
     </section>
 
     <section data-view="clients" class="hidden">
-      <div class="card"><h2>Aplikasi terdaftar</h2>
-        <p class="hint">Kunci API hanya muncul sekali saat dibuat atau diputar.</p>
+      <div class="card">
+        <div class="head"><div><h2>Aplikasi terdaftar</h2>
+          <p class="hint">Kunci API hanya muncul sekali saat dibuat atau diputar.</p></div>
+          <button class="btn sm" id="newClient">+ Aplikasi</button></div>
         <div id="clients"></div>
       </div>
     </section>
 
     <section data-view="provider" class="hidden">
       <div class="card">
-        <h2>Provider aktif</h2><div id="providers"></div>
+        <div class="head"><div><h2>Provider aktif</h2>
+          <p class="hint">Uji kredensial tanpa membuat transaksi. Konfigurasinya ada di Pengaturan.</p></div></div>
+        <div id="providers"></div>
+        <div id="provMsg" class="msg"></div>
       </div>
       <div class="card">
         <h2>Login GoPay lewat OTP</h2>
@@ -230,6 +252,8 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
     </section>
   </main>
 </div>
+
+<div class="modal" id="modal"><div class="box" id="modalBox"></div></div>
 
 <script>
 const ICONS={
@@ -348,13 +372,18 @@ async function boot(){
       <td class="num">${rp(p.gross_amount)}</td></tr>`),'Belum ada pembayaran lunas.');
 
   $('providers').innerHTML=(provs.detail||[]).map(p=>`
-    <div class="kv"><span>${p.id}${p.id===provs.default?' · default':''}</span>
-    <span>${p.supports_webhook?'webhook':'polling'}${p.needs_unique_amount?' · nominal unik':''}</span></div>`).join('')
-    ||'<p class="empty">Belum ada provider dikonfigurasi.</p>';
+    <div class="kv"><span><b>${p.id}</b>${p.id===provs.default?' · default':''}<br>
+      <span style="font-size:12px">${p.supports_webhook?'webhook':'polling'}${p.needs_unique_amount?' · nominal unik':''}</span></span>
+    <button class="ib" onclick="testProv('${p.id}')">Uji koneksi</button></div>`).join('')
+    ||'<p class="empty">Belum ada provider aktif. Aktifkan di Pengaturan.</p>';
 
-  $('clients').innerHTML=table('<th>Aplikasi</th><th>ID</th><th>Prefix kunci</th><th>Callback</th>',
+  $('clients').innerHTML=table('<th>Aplikasi</th><th>ID</th><th>Prefix</th><th>Status</th><th></th>',
     (cls.clients||[]).map(c=>`<tr><td>${c.name}</td><td class="mono">${c.id}</td>
-      <td class="mono">${c.api_key_prefix}</td><td class="mono">${c.callback_url||'—'}</td></tr>`),
+      <td class="mono">${c.api_key_prefix}</td>
+      <td><span class="pill ${c.active?'p-PAID':'p-EXPIRED'}">${c.active?'aktif':'nonaktif'}</span></td>
+      <td class="act">
+        <button class="ib" onclick="editClient('${c.id}',${JSON.stringify(c.name)},${JSON.stringify(c.callback_url||'')},${c.active})">Ubah</button>
+        <button class="ib danger" onclick="delClient('${c.id}')">Hapus</button></td></tr>`),
     'Belum ada aplikasi terdaftar.');
 
   loadSettings().catch(()=>{});
@@ -365,10 +394,127 @@ async function boot(){
     <td><span class="pill p-${i.status}">${i.status}</span></td>
     <td class="mono">${i.provider}</td>
     <td class="num">${rp(i.payable_amount)}</td>
-    <td class="mono">${new Date(i.created_at).toLocaleString('id-ID',{dateStyle:'short',timeStyle:'short'})}</td></tr>`);
-  const head='<th>Order</th><th>Aplikasi</th><th>Status</th><th>Provider</th><th class="num">Nominal</th><th>Dibuat</th>';
+    <td class="mono">${new Date(i.created_at).toLocaleString('id-ID',{dateStyle:'short',timeStyle:'short'})}</td>
+    <td class="act">
+      <button class="ib" onclick="syncInv('${i.id}')">Cek</button>
+      ${i.status==='PENDING'?`<button class="ib" onclick="cancelInv('${i.id}')">Batal</button>`:''}
+      ${i.status!=='PAID'?`<button class="ib danger" onclick="delInv('${i.id}')">Hapus</button>`:''}
+    </td></tr>`);
+  const head='<th>Order</th><th>Aplikasi</th><th>Status</th><th>Provider</th><th class="num">Nominal</th><th>Dibuat</th><th></th>';
   $('invoices').innerHTML=table(head,rows,'Belum ada invoice.');
   $('recent').innerHTML=table(head,rows.slice(0,6),'Belum ada invoice.');
+}
+
+// ── Modal ──
+function openModal(html){$('modalBox').innerHTML=html;$('modal').classList.add('on');}
+function closeModal(){$('modal').classList.remove('on');}
+$('modal').onclick=e=>{if(e.target===$('modal'))closeModal();};
+
+function keyModal(title,note,key){
+  openModal(`<h3>${title}</h3><p class="hint">${note}</p>
+    <div class="keybox">${key}</div>
+    <div class="row"><button class="btn" onclick="navigator.clipboard.writeText('${key}').then(()=>this.textContent='Tersalin')">Salin</button>
+    <button class="btn ghost" id="mClose">Tutup</button></div>`);
+  $('mClose').onclick=closeModal;
+}
+
+// ── CRUD aplikasi ──
+$('newClient').onclick=()=>{
+  openModal(`<h3>Aplikasi baru</h3><p class="hint">ID dipakai sebagai pengenal tetap dan tidak bisa diubah.</p>
+    <label>ID</label><input id="cId" class="field" placeholder="soal">
+    <label>Nama</label><input id="cName" class="field" placeholder="Soal — tryout">
+    <label>Callback URL</label><input id="cCb" class="field" placeholder="https://soal.nusawangsa.com/api/payment/webhook">
+    <div class="row"><button class="btn" id="cSave">Buat</button><button class="btn ghost" id="cCancel">Batal</button></div>
+    <div id="cMsg" class="msg"></div>`);
+  $('cCancel').onclick=closeModal;
+  $('cSave').onclick=async()=>{
+    try{
+      const d=await api('/hehehe/api/clients',{method:'POST',body:JSON.stringify({
+        id:$('cId').value.trim(),name:$('cName').value.trim(),callback_url:$('cCb').value.trim()||null})});
+      keyModal('Aplikasi dibuat','Kunci API ini hanya ditampilkan sekali. Simpan sekarang.',d.apiKey);
+      boot();
+    }catch(e){msg($('cMsg'),e.message,false);}
+  };
+};
+
+async function editClient(id,name,cb,active){
+  openModal(`<h3>Ubah aplikasi</h3><p class="hint">ID <code>${id}</code> tidak bisa diubah.</p>
+    <label>Nama</label><input id="eName" class="field" value="${name}">
+    <label>Callback URL</label><input id="eCb" class="field" value="${cb||''}">
+    <label>Status</label><select id="eAct" class="field">
+      <option value="true"${active?' selected':''}>Aktif</option>
+      <option value="false"${!active?' selected':''}>Nonaktif</option></select>
+    <div class="row"><button class="btn" id="eSave">Simpan</button>
+      <button class="btn ghost" id="eRot">Putar kunci</button>
+      <button class="btn ghost" id="eCancel">Batal</button></div>
+    <div id="eMsg" class="msg"></div>`);
+  $('eCancel').onclick=closeModal;
+  $('eSave').onclick=async()=>{
+    try{
+      await api('/hehehe/api/clients/'+id,{method:'PATCH',body:JSON.stringify({
+        name:$('eName').value.trim(),callback_url:$('eCb').value.trim()||null,
+        active:$('eAct').value==='true'})});
+      closeModal();boot();
+    }catch(e){msg($('eMsg'),e.message,false);}
+  };
+  $('eRot').onclick=async()=>{
+    if(!confirm('Kunci lama akan langsung tidak berlaku. Lanjut?'))return;
+    try{
+      const d=await api('/hehehe/api/clients/'+id+'/rotate-key',{method:'POST'});
+      keyModal('Kunci diputar','Kunci lama sudah tidak berlaku. Simpan yang baru sekarang.',d.apiKey);
+    }catch(e){msg($('eMsg'),e.message,false);}
+  };
+}
+
+async function delClient(id){
+  if(!confirm(`Hapus aplikasi ${id}?`))return;
+  try{await api('/hehehe/api/clients/'+id,{method:'DELETE'});boot();}
+  catch(e){alert(e.message);}
+}
+
+// ── CRUD invoice ──
+$('newInv').onclick=async()=>{
+  const cls=await api('/hehehe/api/clients');
+  const provs=await api('/hehehe/api/providers');
+  openModal(`<h3>Invoice baru</h3><p class="hint">order_id bersifat idempoten per aplikasi.</p>
+    <label>Aplikasi</label><select id="iCl" class="field">${
+      (cls.clients||[]).filter(c=>c.active).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
+    <label>Order ID</label><input id="iOrd" class="field" placeholder="INV-2026-001">
+    <label>Nominal (Rp)</label><input id="iAmt" class="field" type="number" placeholder="50000">
+    <label>Provider</label><select id="iProv" class="field"><option value="">default</option>${
+      (provs.active||[]).map(p=>`<option value="${p}">${p}</option>`).join('')}</select>
+    <div class="row"><button class="btn" id="iSave">Buat</button><button class="btn ghost" id="iCancel">Batal</button></div>
+    <div id="iMsg" class="msg"></div>`);
+  $('iCancel').onclick=closeModal;
+  $('iSave').onclick=async()=>{
+    try{
+      await api('/hehehe/api/invoices',{method:'POST',body:JSON.stringify({
+        client_id:$('iCl').value,order_id:$('iOrd').value.trim(),
+        amount:Number($('iAmt').value),provider:$('iProv').value||undefined})});
+      closeModal();boot();
+    }catch(e){msg($('iMsg'),e.message,false);}
+  };
+};
+
+async function cancelInv(id){
+  if(!confirm('Batalkan invoice ini?'))return;
+  try{await api('/hehehe/api/invoices/'+id+'/cancel',{method:'POST'});boot();}
+  catch(e){alert(e.message);}
+}
+async function delInv(id){
+  if(!confirm('Hapus invoice ini permanen?'))return;
+  try{await api('/hehehe/api/invoices/'+id,{method:'DELETE'});boot();}
+  catch(e){alert(e.message);}
+}
+async function syncInv(id){
+  try{const d=await api('/hehehe/api/invoices/'+id+'/sync',{method:'POST'});
+    alert(`Status di provider: ${d.provider_status}. ${d.updated?'Invoice diperbarui menjadi PAID.':'Tidak ada perubahan.'}`);boot();}
+  catch(e){alert(e.message);}
+}
+async function testProv(id){
+  try{const d=await api('/hehehe/api/providers/'+id+'/test',{method:'POST'});
+    msg($('provMsg'),`${id}: ${d.detail}`,d.ok);}
+  catch(e){msg($('provMsg'),e.message,false);}
 }
 
 // ── Pengaturan ──

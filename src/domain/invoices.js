@@ -176,6 +176,46 @@ async function listPending(pool, provider) {
   return rows;
 }
 
+/**
+ * Membatalkan invoice.
+ *
+ * Hanya yang masih PENDING. Membatalkan yang sudah PAID akan menghapus
+ * pemasukan yang benar-benar diterima dari laporan, jadi ditolak.
+ */
+async function cancelInvoice(pool, id) {
+  const { rows } = await pool.query(
+    `UPDATE invoices SET status = 'CANCELLED'
+     WHERE id = $1 AND status = 'PENDING' RETURNING *`, [id]
+  );
+  if (rows[0]) return rows[0];
+  const cur = await pool.query('SELECT status FROM invoices WHERE id = $1', [id]);
+  if (!cur.rows[0]) return null;
+  throw Object.assign(
+    new Error(`Hanya invoice PENDING yang bisa dibatalkan; status saat ini ${cur.rows[0].status}.`),
+    { statusCode: 409 }
+  );
+}
+
+/**
+ * Menghapus invoice permanen.
+ *
+ * Yang sudah PAID tidak boleh dihapus: itu catatan uang yang benar-benar
+ * masuk, dan menghapusnya membuat laporan tidak lagi mencerminkan kenyataan.
+ */
+async function deleteInvoice(pool, id) {
+  const cur = await pool.query('SELECT status FROM invoices WHERE id = $1', [id]);
+  if (!cur.rows[0]) return false;
+  if (cur.rows[0].status === 'PAID') {
+    throw Object.assign(
+      new Error('Invoice PAID tidak bisa dihapus; itu catatan pemasukan yang benar-benar diterima.'),
+      { statusCode: 409 }
+    );
+  }
+  await pool.query('DELETE FROM invoices WHERE id = $1', [id]);
+  return true;
+}
+
 module.exports = {
   createInvoice, findByOrderId, findById, markPaid, expireOverdue, listPending, newId,
+  cancelInvoice, deleteInvoice,
 };
