@@ -683,7 +683,7 @@ function txDetail(i){
   const t=(window._tx||[])[i]; if(!t)return;
   const dt=t.detail||{};
   const hist=(dt.history||[]).map(h=>`<div class="kv">
-    <span>${h.action||h.status||h.type||'perubahan'}</span>
+    <span>${h.action_name||h.action||h.status||'perubahan'}</span>
     <span class="mono" style="font-size:11px">${h.action_time||h.time||'—'}</span></div>`).join('')
     ||'<p class="empty">Tidak ada linimasa.</p>';
   openModal(`<h3>Detail mutasi</h3>
