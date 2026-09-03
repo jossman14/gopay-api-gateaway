@@ -114,13 +114,50 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .ib{padding:5px 10px;border-radius:9px;font-size:12px;font-weight:600;background:#f5f4fa;color:var(--muted)}
 .ib:hover{background:var(--violet-soft);color:var(--violet)}
 .ib.danger:hover{background:var(--pink-soft);color:#c02b6f}
-.modal{position:fixed;inset:0;background:rgba(30,27,51,.34);display:none;place-items:center;padding:20px;z-index:50}
-.modal.on{display:grid}
-.modal .box{background:var(--card);border-radius:20px;padding:26px;width:100%;max-width:430px;box-shadow:0 20px 60px -20px rgba(30,27,51,.4)}
+.modal{position:fixed;inset:0;background:rgba(30,27,51,.42);display:none;z-index:50;
+  padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.modal.on{display:flex;align-items:flex-start;justify-content:center}
+/* Isi panjang harus bisa digulir DI DALAM kotaknya. Tanpa max-height dan
+   overflow, panduan yang panjang terpotong di luar layar tanpa jalan keluar. */
+.modal .box{background:var(--card);border-radius:20px;width:100%;max-width:440px;
+  box-shadow:0 24px 70px -24px rgba(30,27,51,.45);margin:auto;
+  max-height:calc(100vh - 32px);display:flex;flex-direction:column;overflow:hidden}
+.modal .box.wide{max-width:760px}
+.modal .box>.mhead{padding:20px 24px 14px;border-bottom:1px solid var(--line);
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex:none}
+.modal .box>.mbody{padding:20px 24px;overflow-y:auto;flex:1;min-height:0}
+.modal .box>.mfoot{padding:14px 24px;border-top:1px solid var(--line);flex:none;
+  display:flex;gap:9px;flex-wrap:wrap;background:var(--card)}
+.modal .box>.pad{padding:24px;overflow-y:auto;min-height:0}
 .modal h3{margin:0 0 4px;font-size:17px}
 .modal p.hint{margin:0 0 14px}
+.xbtn{background:transparent;color:var(--muted);font-size:22px;line-height:1;padding:2px 8px;
+  border-radius:9px;flex:none}
+.xbtn:hover{background:#f5f4fa;color:var(--ink)}
 .keybox{background:#f7f6fc;border:1px solid var(--line);border-radius:11px;padding:11px;
   font-family:ui-monospace,Menlo,monospace;font-size:12.5px;word-break:break-all;margin-top:10px}
+/* Kode panjang digulir mendatar di dalam kotaknya sendiri, tidak memaksa
+   seluruh halaman ikut melebar. */
+.code{position:relative;background:#1e1b33;color:#e8eaed;border-radius:12px;margin:0 0 4px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.6}
+.code pre{margin:0;padding:14px 16px;overflow-x:auto;white-space:pre}
+.code .cp{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.12);color:#fff;
+  font-size:11px;padding:4px 9px;border-radius:8px;opacity:0;transition:opacity .15s}
+.code:hover .cp{opacity:1}
+.code .cp:hover{background:rgba(255,255,255,.24)}
+.tabs{display:flex;gap:6px;margin:0 0 10px;flex-wrap:wrap}
+.tabs button{padding:6px 13px;border-radius:9px;background:#f5f4fa;color:var(--muted);
+  font-size:12.5px;font-weight:600}
+.tabs button.on{background:var(--violet-soft);color:var(--violet)}
+.gstep{display:flex;gap:11px;margin:0 0 8px;align-items:center}
+.gstep .gn{width:23px;height:23px;border-radius:50%;background:var(--violet-soft);color:var(--violet);
+  display:grid;place-items:center;font-size:11.5px;font-weight:700;flex:none}
+.gstep b{font-size:14px}
+@media(max-width:560px){
+  .modal{padding:8px}
+  .modal .box>.mhead,.modal .box>.mbody,.modal .box>.mfoot,.modal .box>.pad{padding-left:16px;padding-right:16px}
+  .code pre{font-size:11px}
+}
 .head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:4px}
 .step{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
 .step:last-child{border-bottom:0}
@@ -550,8 +587,33 @@ async function boot(){
 }
 
 // ── Modal ──
-function openModal(html){$('modalBox').innerHTML=html;$('modal').classList.add('on');}
+function openModal(html){
+  $('modalBox').className='box';
+  $('modalBox').innerHTML='<div class="pad">'+html+'</div>';
+  $('modal').classList.add('on');
+}
+/** Modal terstruktur: kepala tetap, isi bergulir, kaki tetap. */
+function openSheet({title,hint,body,foot,wide}){
+  $('modalBox').className='box'+(wide?' wide':'');
+  $('modalBox').innerHTML=
+    '<div class="mhead"><div><h3>'+title+'</h3>'+(hint?'<p class="hint" style="margin:0">'+hint+'</p>':'')+'</div>'+
+    '<button class="xbtn" data-close="1" aria-label="Tutup">&times;</button></div>'+
+    '<div class="mbody">'+body+'</div>'+
+    (foot?'<div class="mfoot">'+foot+'</div>':'');
+  $('modal').classList.add('on');
+}
 function closeModal(){$('modal').classList.remove('on');}
+// Tombol tutup dan tombol berdata-close mana pun.
+document.addEventListener('click',e=>{ if(e.target.closest('[data-close]')) closeModal(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+/** Menyalin dari elemen <code> terdekat. */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('.cp'); if(!b)return;
+  const pre=b.parentElement.querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(()=>{
+    const t=b.textContent; b.textContent='Tersalin'; setTimeout(()=>b.textContent=t,1400);
+  });
+});
 $('modal').onclick=e=>{if(e.target===$('modal'))closeModal();};
 
 function keyModal(title,note,key){
@@ -623,81 +685,192 @@ async function delClient(id){
  * diputar. Cuplikan memakai placeholder agar panduan ini aman dibuka kapan pun
  * tanpa membocorkan kredensial ke layar.
  */
-function guideClient(id, cb){
-  const base='https://bayar.nusawangsa.com';
-  const wh=cb||'https://aplikasimu.com/webhook/bayar';
-  const buat=`const res = await fetch('${base}/v1/invoices', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'X-API-Key': process.env.BAYAR_API_KEY,   // kunci aplikasi "${id}"
-  },
-  body: JSON.stringify({
-    order_id: 'INV-2026-0001',   // nomor pesanan milikmu
-    amount: 50000,
-    callback_url: '${wh}',
-  }),
-});
-const { data } = await res.json();
-// Tagihkan data.invoice.payable_amount, BUKAN amount.
-// Selisihnya kode unik yang dipakai untuk mengenali pembayaran.`;
+const GUIDE_LANGS = ['Node.js', 'Python', 'PHP', 'cURL'];
 
-  const verif=`const crypto = require('crypto');
+function guideSnippets(id, cb) {
+  const base = 'https://bayar.nusawangsa.com';
+  const wh = cb || 'https://aplikasimu.com/webhook/bayar';
+  const j = (a) => a.join('\n');
 
-// rawBody harus body MENTAH, bukan hasil parse lalu diserialisasi ulang.
-function verifikasi(secret, rawBody, header) {
-  const b = Object.fromEntries(header.split(',').map(p => p.split('=')));
-  const ts = Number(b.t);
-  if (!Number.isFinite(ts) || Math.abs(Date.now()/1000 - ts) > 300) return false;
-  const harap = crypto.createHmac('sha256', secret)
-    .update(\`\${ts}.\${rawBody}\`).digest('hex');
-  const x = Buffer.from(harap, 'hex');
-  const y = Buffer.from(b.v1 || '', 'hex');
-  return x.length === y.length && crypto.timingSafeEqual(x, y);
-}`;
-
-  openModal(`<h3>Integrasi — ${id}</h3>
-    <p class="hint">Kunci API tidak ditampilkan di sini; ia hanya muncul sekali saat dibuat atau diputar.</p>
-
-    <h3 style="font-size:13px;margin:16px 0 6px">1 · Buat tagihan</h3>
-    <pre class="keybox" style="white-space:pre-wrap;font-size:11.5px;line-height:1.5">${buat.replace(/</g,'&lt;')}</pre>
-
-    <h3 style="font-size:13px;margin:16px 0 6px">2 · Verifikasi webhook</h3>
-    <p class="hint" style="margin:0 0 8px">Tanpa ini siapa pun yang menebak URL callback bisa menandai pesanan lunas.</p>
-    <pre class="keybox" style="white-space:pre-wrap;font-size:11.5px;line-height:1.5">${verif.replace(/</g,'&lt;')}</pre>
-
-    <h3 style="font-size:13px;margin:16px 0 6px">3 · Bila webhook terlewat</h3>
-    <div class="kv"><span>Cek status</span><span class="mono" style="font-size:11px">GET /v1/invoices/by-order/{orderId}</span></div>
-    <div class="kv"><span>Kirim ulang</span><span class="mono" style="font-size:11px">POST /v1/invoices/{id}/replay-webhook</span></div>
-    <div class="kv"><span>Laporan</span><span class="mono" style="font-size:11px">GET /v1/reports/revenue</span></div>
-
-    <div class="row">
-      <button class="btn" id="gCopy">Salin contoh</button>
-      <button class="btn ghost" onclick="window.open('${base}/hehehe/docs','_blank')">Dokumentasi lengkap</button>
-      <button class="btn ghost" id="gClose">Tutup</button>
-    </div>`);
-  $('gClose').onclick=closeModal;
-  $('gCopy').onclick=function(){ navigator.clipboard.writeText(buat).then(()=>this.textContent='Tersalin'); };
+  return {
+    'Node.js': {
+      buat: j([
+        "const res = await fetch('" + base + "/v1/invoices', {",
+        "  method: 'POST',",
+        "  headers: {",
+        "    'Content-Type': 'application/json',",
+        "    'X-API-Key': process.env.BAYAR_API_KEY,   // kunci aplikasi \"" + id + "\"",
+        '  },',
+        '  body: JSON.stringify({',
+        "    order_id: 'INV-2026-0001',   // nomor pesanan milikmu",
+        '    amount: 50000,',
+        "    callback_url: '" + wh + "',",
+        '  }),',
+        '});',
+        'const { data } = await res.json();',
+        '',
+        '// Tagihkan data.invoice.payable_amount, BUKAN amount.',
+        '// Selisihnya kode unik untuk mengenali pembayaran mana milik tagihan ini.',
+      ]),
+      verif: j([
+        "const crypto = require('crypto');",
+        '',
+        '// rawBody harus body MENTAH, bukan hasil parse lalu diserialisasi ulang:',
+        '// urutan kunci bisa berubah dan tanda tangannya jadi tidak cocok.',
+        'function verifikasi(secret, rawBody, header) {',
+        "  const b = Object.fromEntries(header.split(',').map(p => p.split('=')));",
+        '  const ts = Number(b.t);',
+        '  if (!Number.isFinite(ts)) return false;',
+        '  // Menolak kiriman lama membuat serangan putar-ulang tidak berguna.',
+        '  if (Math.abs(Date.now() / 1000 - ts) > 300) return false;',
+        '',
+        "  const harap = crypto.createHmac('sha256', secret)",
+        "    .update(ts + '.' + rawBody).digest('hex');",
+        "  const x = Buffer.from(harap, 'hex');",
+        "  const y = Buffer.from(b.v1 || '', 'hex');",
+        '  return x.length === y.length && crypto.timingSafeEqual(x, y);',
+        '}',
+      ]),
+    },
+    Python: {
+      buat: j([
+        'import os, requests',
+        '',
+        'r = requests.post(',
+        '    "' + base + '/v1/invoices",',
+        '    headers={"X-API-Key": os.environ["BAYAR_API_KEY"]},',
+        '    json={',
+        '        "order_id": "INV-2026-0001",   # nomor pesanan milikmu',
+        '        "amount": 50000,',
+        '        "callback_url": "' + wh + '",',
+        '    },',
+        ')',
+        'invoice = r.json()["data"]["invoice"]',
+        '',
+        '# Tagihkan invoice["payable_amount"], BUKAN amount.',
+      ]),
+      verif: j([
+        'import hmac, hashlib, time',
+        '',
+        '# raw_body harus bytes MENTAH dari request, bukan hasil json.dumps ulang.',
+        'def verifikasi(secret: str, raw_body: bytes, header: str) -> bool:',
+        '    bagian = dict(p.split("=", 1) for p in header.split(","))',
+        '    ts = int(bagian.get("t", 0))',
+        '    # Menolak kiriman lama membuat serangan putar-ulang tidak berguna.',
+        '    if abs(time.time() - ts) > 300:',
+        '        return False',
+        '    harap = hmac.new(',
+        '        secret.encode(), f"{ts}.".encode() + raw_body, hashlib.sha256',
+        '    ).hexdigest()',
+        '    return hmac.compare_digest(harap, bagian.get("v1", ""))',
+      ]),
+    },
+    PHP: {
+      buat: j([
+        '<?php',
+        '$ch = curl_init("' + base + '/v1/invoices");',
+        'curl_setopt_array($ch, [',
+        '  CURLOPT_POST => true,',
+        '  CURLOPT_RETURNTRANSFER => true,',
+        '  CURLOPT_HTTPHEADER => [',
+        '    "Content-Type: application/json",',
+        '    "X-API-Key: " . getenv("BAYAR_API_KEY"),',
+        '  ],',
+        '  CURLOPT_POSTFIELDS => json_encode([',
+        '    "order_id"     => "INV-2026-0001",',
+        '    "amount"       => 50000,',
+        '    "callback_url" => "' + wh + '",',
+        '  ]),',
+        ']);',
+        '$invoice = json_decode(curl_exec($ch), true)["data"]["invoice"];',
+        '',
+        '// Tagihkan $invoice["payable_amount"], BUKAN amount.',
+      ]),
+      verif: j([
+        '<?php',
+        '// $raw harus file_get_contents("php://input"), bukan $_POST.',
+        'function verifikasi(string $secret, string $raw, string $header): bool {',
+        '  parse_str(str_replace(",", "&", $header), $b);',
+        '  $ts = (int)($b["t"] ?? 0);',
+        '  // Menolak kiriman lama membuat serangan putar-ulang tidak berguna.',
+        '  if (abs(time() - $ts) > 300) return false;',
+        '  $harap = hash_hmac("sha256", $ts . "." . $raw, $secret);',
+        '  return hash_equals($harap, $b["v1"] ?? "");',
+        '}',
+      ]),
+    },
+    'cURL': {
+      buat: j([
+        'curl -X POST ' + base + '/v1/invoices \\',
+        '  -H "Content-Type: application/json" \\',
+        '  -H "X-API-Key: $BAYAR_API_KEY" \\',
+        '  -d \'{',
+        '    "order_id": "INV-2026-0001",',
+        '    "amount": 50000,',
+        '    "callback_url": "' + wh + '"',
+        '  }\'',
+      ]),
+      verif: j([
+        '# Cek status bila webhook terlewat:',
+        'curl ' + base + '/v1/invoices/by-order/INV-2026-0001 \\',
+        '  -H "X-API-Key: $BAYAR_API_KEY"',
+        '',
+        '# Paksa kirim ulang notifikasi:',
+        'curl -X POST ' + base + '/v1/invoices/INVOICE_ID/replay-webhook \\',
+        '  -H "X-API-Key: $BAYAR_API_KEY"',
+      ]),
+    },
+  };
 }
 
-/**
- * Aksi tabel aplikasi dipasang lewat delegasi, bukan atribut onclick.
- *
- * Versi sebelumnya menyisipkan JSON.stringify(nama) ke dalam onclick="...".
- * Nama yang mengandung tanda kutip menutup atribut lebih awal sehingga
- * handlernya rusak diam-diam — tombol tampak normal tapi tidak melakukan apa
- * pun. Menyimpan datanya di JS dan hanya menaruh id di data-attribute
- * menghilangkan seluruh persoalan kutip itu.
- */
-document.addEventListener('click', (e) => {
-  const b = e.target.closest('#clients [data-act]');
-  if (!b) return;
-  const c = (window._clients || []).find((x) => x.id === b.dataset.id);
-  if (!c) return;
-  if (b.dataset.act === 'guide') guideClient(c.id, c.callback_url || '');
-  if (b.dataset.act === 'edit') editClient(c.id, c.name, c.callback_url || '', c.active);
-  if (b.dataset.act === 'del') delClient(c.id);
-});
+function codeBlock(text) {
+  return '<div class="code"><button class="cp">Salin</button><pre>' +
+    esc(text) + '</pre></div>';
+}
+
+function guideClient(id, cb) {
+  const snip = guideSnippets(id, cb);
+  let lang = 'Node.js';
+
+  const render = () => {
+    const s = snip[lang];
+    return '<div class="tabs">' +
+      GUIDE_LANGS.map((l) =>
+        '<button data-lang="' + esc(l) + '" class="' + (l === lang ? 'on' : '') + '">' + esc(l) + '</button>'
+      ).join('') + '</div>' +
+      '<div class="gstep"><div class="gn">1</div><b>Buat tagihan</b></div>' +
+      '<p class="hint" style="margin:0 0 8px">Idempoten terhadap <code>order_id</code> milikmu — memanggil ulang mengembalikan tagihan yang sama.</p>' +
+      codeBlock(s.buat) +
+      '<div class="gstep" style="margin-top:20px"><div class="gn">2</div><b>' +
+        (lang === 'cURL' ? 'Bila webhook terlewat' : 'Verifikasi webhook') + '</b></div>' +
+      '<p class="hint" style="margin:0 0 8px">' +
+        (lang === 'cURL'
+          ? 'Polling status saat pembeli kembali ke halaman pesanan sudah cukup untuk sebagian besar kasus.'
+          : 'Tanpa ini siapa pun yang menebak URL callback bisa menandai pesanan lunas.') +
+      '</p>' +
+      codeBlock(s.verif) +
+      '<div class="gstep" style="margin-top:20px"><div class="gn">3</div><b>Endpoint lain</b></div>' +
+      '<div class="kv"><span>Cek status pesanan</span><span class="mono" style="font-size:11px">GET /v1/invoices/by-order/{orderId}</span></div>' +
+      '<div class="kv"><span>Kirim ulang notifikasi</span><span class="mono" style="font-size:11px">POST /v1/invoices/{id}/replay-webhook</span></div>' +
+      '<div class="kv"><span>Gambar QR</span><span class="mono" style="font-size:11px">GET /v1/invoices/{id}/qr.png</span></div>' +
+      '<div class="kv"><span>Laporan pemasukan</span><span class="mono" style="font-size:11px">GET /v1/reports/revenue</span></div>';
+  };
+
+  const show = () => {
+    openSheet({
+      wide: true,
+      title: 'Integrasi — ' + esc(id),
+      hint: 'Kunci API tidak ditampilkan di sini; ia hanya muncul sekali saat dibuat atau diputar.',
+      body: render(),
+      foot: '<button class="btn ghost" onclick="window.open(\'https://bayar.nusawangsa.com/hehehe/docs\',\'_blank\')">Dokumentasi lengkap</button>' +
+            '<button class="btn ghost" data-close="1">Tutup</button>',
+    });
+    $('modalBox').querySelectorAll('[data-lang]').forEach((b) => {
+      b.onclick = () => { lang = b.dataset.lang; show(); };
+    });
+  };
+  show();
+}
 
 // ── CRUD invoice ──
 $('newInv').onclick=async()=>{

@@ -59,3 +59,20 @@ test('setiap menu sidebar punya section-nya', () => {
     assert.ok(sections.includes(v), `menu "${v}" tidak punya section data-view`);
   }
 });
+
+test('modal dapat digulir dan tidak memotong isi panjang', () => {
+  // Tanpa max-height + overflow, panduan panjang terpotong di luar layar tanpa
+  // jalan keluar — persis keluhan yang memicu perbaikan ini.
+  const css = HTML.slice(HTML.indexOf('<style>'), HTML.indexOf('</style>'));
+  assert.match(css, /\.modal \.box\{[^}]*max-height/, 'kotak modal harus punya max-height');
+  for (const bagian of ['.mbody', '.pad']) {
+    const re = new RegExp('\\.modal \\.box>\\' + bagian + '\\{[^}]*overflow-y:\\s*auto');
+    assert.match(css, re, `${bagian} harus bisa digulir`);
+  }
+  assert.match(css, /@media\(max-width:560px\)/, 'harus ada penyesuaian layar kecil');
+});
+
+test('blok kode digulir mendatar, tidak memaksa halaman melebar', () => {
+  const css = HTML.slice(HTML.indexOf('<style>'), HTML.indexOf('</style>'));
+  assert.match(css, /\.code pre\{[^}]*overflow-x:\s*auto/);
+});
