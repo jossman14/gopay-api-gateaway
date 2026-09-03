@@ -276,9 +276,15 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
               <option value="90">90 hari</option>
               <option value="365">1 tahun</option>
             </select>
-            <select id="txSettled" class="field" style="width:auto;padding:6px 10px">
-              <option value="0" selected>Semua mutasi</option>
-              <option value="1">Hanya yang settle</option>
+            <select id="txStatus" class="field" style="width:auto;padding:6px 10px">
+              <option value="" selected>Semua status</option>
+              <option value="SETTLEMENT,CAPTURE">Diterima (SETTLEMENT, CAPTURE)</option>
+              <option value="SETTLEMENT">SETTLEMENT</option>
+              <option value="CAPTURE">CAPTURE</option>
+              <option value="CANCEL">CANCEL</option>
+              <option value="EXPIRE">EXPIRE</option>
+              <option value="DENY">DENY</option>
+              <option value="PENDING">PENDING</option>
             </select>
             <button class="btn sm" id="txLive">Tarik</button>
           </div></div>
@@ -634,16 +640,19 @@ $('txReload').onclick=loadTx;
 $('txLive').onclick=async()=>{
   $('txLive').disabled=true;
   try{
-    const days=$('txDays').value, settled=$('txSettled').value;
-    const d=await api(`/hehehe/api/gopay/transactions?limit=100&days=${days}&settled=${settled}`);
+    const days=$('txDays').value, st=$('txStatus').value;
+    const d=await api(`/hehehe/api/gopay/transactions?limit=100&days=${days}`+
+      (st?`&statuses=${encodeURIComponent(st)}`:''));
     $('txLiveList').innerHTML=d.count?table(
-      '<th>ID mutasi</th><th class="num">Nominal terbaca</th><th>Waktu</th>',
+      '<th>ID mutasi</th><th>Status</th><th class="num">Nominal</th><th>Waktu</th>',
       d.transactions.map(t=>`<tr><td class="mono">${t.id}</td>
+        <td><span class="pill ${t.settled?'p-PAID':'p-CANCELLED'}">${t.status||'—'}</span></td>
         <td class="num">${rp(t.amount)}<br><span style="font-size:11px;color:var(--muted)">dilaporkan ${t.amount_raw} ÷ ${t.amount_scale}</span></td>
         <td class="mono">${t.transaction_time||'—'}</td></tr>`),'')
       :`<p class="empty">Tidak ada mutasi dalam ${d.days} hari terakhir.</p>`;
-    msg($('txMsg'),`${d.count} mutasi dalam ${d.days} hari terakhir.`+
-      (settled==='1'?' Hanya yang berstatus settle.':' Termasuk yang belum settle.'),true);
+    const diterima=d.transactions.filter(t=>t.settled).length;
+    msg($('txMsg'),`${d.count} mutasi dalam ${d.days} hari. ${diterima} diterima, `+
+      `${d.count-diterima} tidak — yang tidak diterima tidak akan pernah melunasi invoice.`,true);
   }catch(e){msg($('txMsg'),e.message,false);}
   finally{$('txLive').disabled=false;}
 };

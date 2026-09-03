@@ -294,7 +294,10 @@ function buildAdminRoutes({ pool, runtime }) {
       const list = await registry().get('gopay').listTransactions({
         limit,
         windowHours: days * 24,
-        statuses: req.query.settled === '1' ? 'SETTLEMENT,CAPTURE' : null,
+        // statuses diteruskan apa adanya agar operator bisa menelusuri status
+        // apa pun, termasuk CANCEL — yang justru paling perlu dilihat saat
+        // pembayaran dilaporkan gagal.
+        statuses: req.query.statuses || (req.query.settled === '1' ? 'SETTLEMENT,CAPTURE' : null),
         paymentTypes: req.query.types || null,
       });
       res.json({ success: true, data: { count: list.length, days, transactions: list.map((t) => ({
@@ -302,6 +305,9 @@ function buildAdminRoutes({ pool, runtime }) {
         amount: t.amount,
         amount_raw: t.amountRaw,
         amount_scale: t.amountScale,
+        status: t.status,
+        settled: t.settled,
+        order_id: t.orderId,
         transaction_time: t.transactionTime,
         reference: t.reference,
       })) } });

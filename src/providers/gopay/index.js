@@ -134,10 +134,29 @@ function normalizeTransaction(tx, scale = 100) {
     amount,
     amountRaw: rawProviderAmount(tx),
     amountScale: scale,
+    // Nama fieldnya transaction_status, bukan status. Membaca 'status' selalu
+    // menghasilkan undefined dan membuat setiap mutasi tampak tanpa keterangan.
+    status: tx.transaction_status ?? tx.status ?? null,
+    settled: isSettled(tx.transaction_status ?? tx.status),
     transactionTime: tx.transaction_time ?? tx.created_at ?? tx.time ?? null,
-    reference: tx.reference ?? tx.merchant_reference ?? null,
+    orderId: tx.order_id ?? null,
+    reference: tx.gopay_transaction_reference ?? tx.reference ?? tx.merchant_reference ?? null,
     raw: tx,
   };
 }
 
-module.exports = { GopayProvider, normalizeTransaction, TRANSACTIONS_URL };
+/**
+ * Status yang berarti uang benar-benar diterima.
+ *
+ * Daftar putih, bukan daftar hitam: status yang tidak dikenal diperlakukan
+ * sebagai belum diterima. Kalau GoPay memperkenalkan status baru, akibat
+ * terburuknya invoice tidak terlunasi dan itu terlihat — bukan barang terlanjur
+ * diserahkan atas pembayaran yang ternyata batal.
+ */
+const SETTLED_STATUSES = new Set(['SETTLEMENT', 'CAPTURE', 'SUCCESS', 'SETTLED']);
+
+function isSettled(status) {
+  return SETTLED_STATUSES.has(String(status || '').toUpperCase());
+}
+
+module.exports = { GopayProvider, normalizeTransaction, isSettled, SETTLED_STATUSES, TRANSACTIONS_URL };

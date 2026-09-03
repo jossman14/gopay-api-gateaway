@@ -41,6 +41,13 @@ async function reconcileOnce(pool, provider, { log = () => {} } = {}) {
   for (const inv of pending) byAmount.set(Number(inv.payable_amount), inv);
 
   for (const tx of transactions) {
+    // Pemeriksaan kedua, terlepas dari filter yang dikirim ke provider.
+    // Menggantungkan keselamatan uang pada satu parameter query berarti satu
+    // salah ketik cukup untuk melunasi invoice dari transaksi yang dibatalkan.
+    if (tx.settled === false) {
+      log(`mutasi ${tx.providerTransactionId} dilewati: status ${tx.status}`);
+      continue;
+    }
     const invoice = byAmount.get(tx.amount);
     if (!invoice) continue;
 

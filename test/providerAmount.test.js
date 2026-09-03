@@ -43,3 +43,30 @@ test('KEAMANAN: bayar seperseratus tidak lagi bisa melunasi invoice penuh', () =
   assert.equal(providerAmount({ gross_amount: dilaporkan }, 100), 1000);
   assert.notEqual(providerAmount({ gross_amount: dilaporkan }, 100), 100000);
 });
+
+const { normalizeTransaction, isSettled } = require('../src/providers/gopay');
+
+test('status dibaca dari transaction_status, bukan status', () => {
+  // Membaca 'status' selalu undefined pada respons Merchant Analytics.
+  const t = normalizeTransaction({ id: 'T1', gross_amount: 1100, transaction_status: 'SETTLEMENT' });
+  assert.equal(t.status, 'SETTLEMENT');
+  assert.equal(t.settled, true);
+});
+
+test('CANCEL ditandai belum diterima', () => {
+  const t = normalizeTransaction({ id: 'T2', gross_amount: 200000, transaction_status: 'CANCEL' });
+  assert.equal(t.status, 'CANCEL');
+  assert.equal(t.settled, false, 'transaksi batal tidak boleh dianggap diterima');
+  assert.equal(t.amount, 2000);
+});
+
+test('daftar putih: status tak dikenal dianggap BELUM diterima', () => {
+  // Akibat terburuknya invoice tidak terlunasi dan itu terlihat — bukan barang
+  // terlanjur diserahkan atas pembayaran yang ternyata batal.
+  for (const s of ['PENDING', 'DENY', 'EXPIRE', 'REFUND', 'STATUS_BARU_DARI_GOPAY', '', null]) {
+    assert.equal(isSettled(s), false, `${s} tidak boleh dianggap lunas`);
+  }
+  for (const s of ['SETTLEMENT', 'settlement', 'CAPTURE', 'SUCCESS', 'SETTLED']) {
+    assert.equal(isSettled(s), true, `${s} seharusnya lunas`);
+  }
+});
