@@ -12,12 +12,35 @@
   --amber:#f0a92e; --amber-soft:#fdf1dc;
   --pink:#ef5da8; --pink-soft:#fde8f2;
   --r:18px; --shadow:0 1px 2px rgba(30,27,51,.04),0 8px 24px -12px rgba(30,27,51,.14);
+  --soft:#f7f6fc; --field:#fbfaff; --hover:rgba(124,92,255,.05);
+  --glow:rgba(124,92,255,.07);
+  --ok-ink:#177a4c; --bad-ink:#c02b6f; --warn-ink:#a9700d;
 }
-*{box-sizing:border-box}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#0f0e17; --card:#171622; --ink:#e8e6f0; --muted:#8b88a3; --line:#262438;
+    --violet:#9d7fff; --violet-soft:#2a2544;
+    --green:#4ecb8b; --green-soft:#173226;
+    --amber:#f5b950; --amber-soft:#3a2f16;
+    --pink:#f97fc0; --pink-soft:#3c1a2e;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 24px -12px rgba(0,0,0,.55);
+    --soft:#232135; --field:#1d1b2e; --hover:rgba(157,127,255,.09);
+    --glow:rgba(157,127,255,.05);
+    --ok-ink:#6fd9a3; --bad-ink:#f97fc0; --warn-ink:#f5c069;
+  }
+  .modal{background:rgba(5,4,12,.62)}
+  .code .cp{background:rgba(255,255,255,.16)}
+}
+html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+*{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
 body{margin:0;background:var(--bg);color:var(--ink);
   font:14px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif}
-button{font:inherit;cursor:pointer;border:0}
-input{font:inherit}
+button{font:inherit;cursor:pointer;border:0;color:inherit}
+input{font:inherit;color:var(--ink)}
+::selection{background:var(--violet);color:#fff}
+button,a,input,select{transition-property:color,background-color,border-color,box-shadow,filter,transform,opacity;
+  transition-duration:.16s;transition-timing-function:ease-out}
 
 /* ── Login ─────────────────────────────────────────────── */
 #login{min-height:100vh;display:grid;place-items:center;padding:24px}
@@ -31,19 +54,24 @@ input{font:inherit}
 .loginCard p.sub{color:var(--muted);margin:0 0 22px;font-size:13.5px}
 label{display:block;font-size:12.5px;color:var(--muted);margin:14px 0 6px;font-weight:500}
 .field{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:12px;
-  background:#fbfaff;color:var(--ink);transition:border-color .15s,box-shadow .15s}
-.field:focus{outline:0;border-color:var(--violet);box-shadow:0 0 0 3px var(--violet-soft)}
+  background:var(--field);color:var(--ink);transition-property:border-color,box-shadow,background-color;
+  transition-duration:.16s;transition-timing-function:ease-out}
+.field:focus{outline:0;border-color:var(--violet);box-shadow:0 0 0 3px var(--glow)}
+.field::placeholder{color:var(--muted);opacity:.55}
 .btn{background:var(--violet);color:#fff;padding:11px 18px;border-radius:12px;font-weight:600;
-  transition:filter .15s}
-.btn:hover:not(:disabled){filter:brightness(1.07)}
-.btn:disabled{opacity:.55;cursor:not-allowed}
+  transition-property:filter,transform,box-shadow;transition-duration:.16s;
+  box-shadow:0 1px 2px rgba(124,92,255,.25),0 6px 18px -8px rgba(124,92,255,.45)}
+.btn:hover:not(:disabled){filter:brightness(1.07);box-shadow:0 2px 4px rgba(124,92,255,.28),0 10px 24px -8px rgba(124,92,255,.5)}
+.btn:active:not(:disabled){transform:scale(.96)}
+.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
 .btn.wide{width:100%;margin-top:20px}
-.btn.ghost{background:var(--violet-soft);color:var(--violet)}
+.btn.ghost{background:var(--violet-soft);color:var(--violet);box-shadow:none}
+.btn.ghost:hover:not(:disabled){filter:brightness(1.04);box-shadow:none}
 .btn.sm{padding:7px 13px;border-radius:10px;font-size:13px}
 .msg{margin-top:14px;padding:10px 12px;border-radius:11px;font-size:13px;display:none}
 .msg.show{display:block}
-.msg.ok{background:var(--green-soft);color:#177a4c}
-.msg.bad{background:var(--pink-soft);color:#c02b6f}
+.msg.ok{background:var(--green-soft);color:var(--ok-ink)}
+.msg.bad{background:var(--pink-soft);color:var(--bad-ink)}
 
 /* ── Kerangka aplikasi ─────────────────────────────────── */
 #app{display:none;min-height:100vh;padding:18px;gap:18px;grid-template-columns:224px 1fr}
@@ -52,9 +80,11 @@ aside{background:var(--card);border-radius:22px;box-shadow:var(--shadow);padding
   height:calc(100vh - 36px);position:sticky;top:18px;display:flex;flex-direction:column}
 nav{margin-top:22px;display:flex;flex-direction:column;gap:4px}
 nav a{display:flex;align-items:center;gap:11px;padding:10px 13px;border-radius:13px;
-  color:var(--muted);text-decoration:none;font-weight:500;transition:.15s}
-nav a:hover{background:#faf9ff;color:var(--ink)}
+  color:var(--muted);text-decoration:none;font-weight:500;position:relative}
+nav a:hover{background:var(--hover);color:var(--ink)}
 nav a.on{background:var(--violet-soft);color:var(--violet);font-weight:600}
+nav a.on::before{content:'';position:absolute;left:-16px;top:22%;bottom:22%;width:3px;
+  border-radius:3px;background:var(--violet)}
 nav a svg{width:17px;height:17px;flex:none}
 .spacer{flex:1}
 .who{font-size:12px;color:var(--muted);padding:0 4px 10px;word-break:break-all}
@@ -66,10 +96,13 @@ header.top p{margin:0;color:var(--muted);font-size:13.5px}
 
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:14px;margin-bottom:18px}
 .tile{background:var(--card);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);
-  display:flex;gap:13px;align-items:center}
+  display:flex;gap:13px;align-items:center;transition-property:transform,box-shadow;
+  transition-duration:.18s;transition-timing-function:ease-out}
+.tile:hover{transform:translateY(-2px);box-shadow:0 2px 4px rgba(30,27,51,.05),0 14px 30px -12px rgba(30,27,51,.18)}
 .tile .ico{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex:none}
 .tile .ico svg{width:21px;height:21px}
-.tile .v{font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.15}
+.tile .v{font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.15;
+  font-variant-numeric:tabular-nums}
 .tile .k{font-size:12.5px;color:var(--muted)}
 .v-violet{background:var(--violet-soft);color:var(--violet)}
 .v-green{background:var(--green-soft);color:var(--green)}
@@ -80,48 +113,73 @@ header.top p{margin:0;color:var(--muted);font-size:13.5px}
 @media(max-width:1000px){.grid2{grid-template-columns:1fr}#app{grid-template-columns:1fr}
   aside{height:auto;position:static}}
 
-.card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:20px;margin-bottom:18px}
-.card h2{font-size:15.5px;margin:0 0 3px;letter-spacing:-.01em}
-.card .hint{color:var(--muted);font-size:12.5px;margin:0 0 16px}
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:20px;margin-bottom:18px;
+  border:1px solid transparent}
+@media(prefers-color-scheme:dark){.card{border-color:var(--line)}}
+.card h2{font-size:15.5px;margin:0 0 3px;letter-spacing:-.01em;text-wrap:balance}
+.card .hint{color:var(--muted);font-size:12.5px;margin:0 0 16px;text-wrap:pretty}
 .card h2+table,.card h2+.body{margin-top:16px}
 
 table{width:100%;border-collapse:collapse}
 th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);font-size:13.5px}
 th{color:var(--muted);font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+tbody tr{transition-property:background-color;transition-duration:.12s}
+tbody tr:hover{background:var(--hover)}
 tbody tr:last-child td{border-bottom:0}
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.mono,.mono{font-variant-numeric:tabular-nums}
 .pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11.5px;font-weight:600}
-.p-PENDING{background:var(--amber-soft);color:#a9700d}
-.p-PAID{background:var(--green-soft);color:#177a4c}
-.p-EXPIRED{background:#f1f0f6;color:var(--muted)}
-.p-CANCELLED,.p-FAILED{background:var(--pink-soft);color:#c02b6f}
+.p-PENDING{background:var(--amber-soft);color:var(--warn-ink)}
+.p-PAID{background:var(--green-soft);color:var(--ok-ink)}
+.p-EXPIRED{background:var(--soft);color:var(--muted)}
+.p-CANCELLED,.p-FAILED{background:var(--pink-soft);color:var(--bad-ink)}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
 
 .bars{display:flex;align-items:flex-end;gap:9px;height:132px;margin-top:6px}
 .bars .b{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:7px}
 .bars .fill{width:100%;border-radius:8px 8px 4px 4px;background:linear-gradient(180deg,#a08bff,#7c5cff);min-height:3px}
 .bars .lb{font-size:10.5px;color:var(--muted);white-space:nowrap}
-.empty{color:var(--muted);font-size:13px;padding:14px 0}
+.empty{color:var(--muted);font-size:13px;padding:14px 0;text-align:center}
+.empty::before{content:'';display:block;width:34px;height:34px;margin:0 auto 8px;
+  border-radius:11px;background:var(--violet-soft);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237c5cff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") center/22px no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237c5cff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") center/22px no-repeat}
+section[data-view].hidden{display:none}
+section[data-view]:not(.hidden){animation:viewin .22s ease-out}
+@keyframes viewin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 .steps{display:flex;gap:7px;margin-bottom:16px;flex-wrap:wrap}
-.steps span{padding:4px 11px;border-radius:99px;background:#f7f6fc;color:var(--muted);font-size:12px}
+.steps span{padding:4px 11px;border-radius:99px;background:var(--soft);color:var(--muted);font-size:12px}
 .steps span.on{background:var(--violet-soft);color:var(--violet);font-weight:600}
 .row{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
 .hidden{display:none!important}
 .kv{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
 .kv:last-child{border-bottom:0}
 .act{display:flex;gap:6px;justify-content:flex-end}
-.ib{padding:5px 10px;border-radius:9px;font-size:12px;font-weight:600;background:#f5f4fa;color:var(--muted)}
+.ib{padding:5px 10px;border-radius:9px;font-size:12px;font-weight:600;background:var(--soft);color:var(--muted);
+  min-height:29px;transition-property:background-color,color,transform}
 .ib:hover{background:var(--violet-soft);color:var(--violet)}
-.ib.danger:hover{background:var(--pink-soft);color:#c02b6f}
+.ib:active{transform:scale(.95)}
+.ib.danger:hover{background:var(--pink-soft);color:var(--bad-ink)}
 .modal{position:fixed;inset:0;background:rgba(30,27,51,.42);display:none;z-index:50;
-  padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.modal.on{display:flex;align-items:flex-start;justify-content:center}
+  padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch;backdrop-filter:blur(4px)}
+.modal.on{display:flex;align-items:flex-start;justify-content:center;
+  animation:fadein .18s ease-out}
 /* Isi panjang harus bisa digulir DI DALAM kotaknya. Tanpa max-height dan
    overflow, panduan yang panjang terpotong di luar layar tanpa jalan keluar. */
 .modal .box{background:var(--card);border-radius:20px;width:100%;max-width:440px;
   box-shadow:0 24px 70px -24px rgba(30,27,51,.45);margin:auto;
   max-height:calc(100vh - 32px);display:flex;flex-direction:column;overflow:hidden}
+.modal.on .box{animation:pop .22s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+@keyframes pop{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+/* Refresh berputar saat boot berjalan */
+.spin{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Indikator baris memuat */
+.skel{color:transparent!important;background:linear-gradient(90deg,var(--soft) 25%,var(--line) 50%,var(--soft) 75%);
+  background-size:200% 100%;animation:shimmer 1.4s linear infinite;border-radius:6px;display:inline-block;width:64px}
+@keyframes shimmer{to{background-position:-200% 0}}
 .modal .box.wide{max-width:760px}
 .modal .box>.mhead{padding:20px 24px 14px;border-bottom:1px solid var(--line);
   display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex:none}
@@ -132,9 +190,9 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .modal h3{margin:0 0 4px;font-size:17px}
 .modal p.hint{margin:0 0 14px}
 .xbtn{background:transparent;color:var(--muted);font-size:22px;line-height:1;padding:2px 8px;
-  border-radius:9px;flex:none}
-.xbtn:hover{background:#f5f4fa;color:var(--ink)}
-.keybox{background:#f7f6fc;border:1px solid var(--line);border-radius:11px;padding:11px;
+  border-radius:9px;flex:none;min-width:36px;min-height:36px}
+.xbtn:hover{background:var(--soft);color:var(--ink)}
+.keybox{background:var(--soft);border:1px solid var(--line);border-radius:11px;padding:11px;
   font-family:ui-monospace,Menlo,monospace;font-size:12.5px;word-break:break-all;margin-top:10px}
 /* Kode panjang digulir mendatar di dalam kotaknya sendiri, tidak memaksa
    seluruh halaman ikut melebar. */
@@ -146,7 +204,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .code:hover .cp{opacity:1}
 .code .cp:hover{background:rgba(255,255,255,.24)}
 .tabs{display:flex;gap:6px;margin:0 0 10px;flex-wrap:wrap}
-.tabs button{padding:6px 13px;border-radius:9px;background:#f5f4fa;color:var(--muted);
+.tabs button{padding:6px 13px;border-radius:9px;background:var(--soft);color:var(--muted);
   font-size:12.5px;font-weight:600}
 .tabs button.on{background:var(--violet-soft);color:var(--violet)}
 .gstep{display:flex;gap:11px;margin:0 0 8px;align-items:center}
@@ -162,9 +220,9 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .step{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
 .step:last-child{border-bottom:0}
 .step .n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex:none;
-  font-size:12px;font-weight:700;background:#f1f0f6;color:var(--muted)}
-.step.ok .n{background:var(--green-soft);color:var(--green)}
-.step.now .n{background:var(--violet);color:#fff}
+  font-size:12px;font-weight:700;background:var(--soft);color:var(--muted)}
+.step.ok .n{background:var(--green-soft);color:var(--ok-ink)}
+.step.now .n{background:var(--violet);color:#fff;box-shadow:0 0 0 4px var(--glow)}
 .step .t{flex:1;min-width:0}
 .step .t b{display:block;font-size:14px;font-weight:600}
 .step .t span{font-size:12.5px;color:var(--muted)}
@@ -176,6 +234,25 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .banner p{margin:3px 0 0;opacity:.9;font-size:13px}
 .banner button{background:#fff;color:var(--violet)}
 .kv span:first-child{color:var(--muted)}
+
+/* ── Toast ─────────────────────────────────────────────── */
+#toasts{position:fixed;bottom:18px;right:18px;display:flex;flex-direction:column;gap:8px;
+  z-index:100;max-width:min(360px,calc(100vw - 32px));pointer-events:none}
+.toast{background:var(--card);color:var(--ink);border-radius:13px;padding:12px 14px;
+  box-shadow:0 4px 12px rgba(30,27,51,.14),0 18px 40px -16px rgba(30,27,51,.3);
+  font-size:13px;display:flex;gap:10px;align-items:flex-start;pointer-events:auto;
+  border-left:3px solid var(--violet);animation:toastin .28s cubic-bezier(.2,.9,.3,1.15)}
+.toast.ok{border-left-color:var(--green)}
+.toast.bad{border-left-color:var(--pink)}
+.toast .tk{flex:1;min-width:0;text-wrap:pretty}
+.toast button{background:none;color:var(--muted);font-size:16px;padding:0 2px;min-width:24px;min-height:24px}
+.toast button:hover{color:var(--ink)}
+.toast.out{animation:toastout .22s ease-in forwards}
+@keyframes toastin{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes toastout{to{opacity:0;transform:translateY(8px)}}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
 </style>
 </head>
 <body>
@@ -423,6 +500,8 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 
 <div class="modal" id="modal"><div class="box" id="modalBox"></div></div>
 
+<div id="toasts"></div>
+
 <script>
 const ICONS={
  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>',
@@ -445,7 +524,40 @@ const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')
   .replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const rp=n=>'Rp'+Number(n||0).toLocaleString('id-ID');
+/** Waktu relatif pendek: "2 mnt lalu", "3 jam lalu", "Kemarin 14.02". */
+function timeAgo(iso){
+  if(!iso)return '—';
+  const d=new Date(iso),diff=(Date.now()-d)/1000;
+  if(diff<0)return d.toLocaleString('id-ID',{dateStyle:'short',timeStyle:'short'});
+  if(diff<45)return 'baru saja';
+  if(diff<3600)return Math.round(diff/60)+' mnt lalu';
+  if(diff<86400)return Math.round(diff/3600)+' jam lalu';
+  if(diff<172800)return 'Kemarin '+d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+  return d.toLocaleString('id-ID',{dateStyle:'short',timeStyle:'short'});
+}
 function msg(el,t,ok){el.textContent=t;el.className='msg show '+(ok?'ok':'bad');}
+
+/** Toast: umpan balik tak memblokir, menggantikan alert(). */
+function toast(t,ok=true,ms=4200){
+  const d=document.createElement('div');
+  d.className='toast '+(ok?'ok':'bad');
+  d.innerHTML='<div class="tk">'+esc(t)+'</div><button aria-label="Tutup">&times;</button>';
+  const kill=()=>{d.classList.add('out');setTimeout(()=>d.remove(),240)};
+  d.querySelector('button').onclick=kill;
+  $('toasts').appendChild(d);
+  if(ms)setTimeout(kill,ms);
+  return kill;
+}
+
+/** Konfirmasi lewat modal, bukan confirm() yang memblokir dan tidak bisa distyle. */
+function askConfirm({title,body,okLabel='Lanjut',danger=false,onOk}){
+  openSheet({title,
+    body:(body?'<p class="hint">'+body+'</p>':'')+
+      '<div class="row" style="margin-top:0">'+
+      '<button class="ib" data-close="1" style="min-height:36px">Batal</button>'+
+      '<button class="btn sm" id="cfOk"'+(danger?' style="background:var(--pink)':'')+'>'+esc(okLabel)+'</button></div>'});
+  $('cfOk').onclick=()=>{closeModal();onOk();};
+}
 
 async function api(path,opts={}){
   const res=await fetch(path,{credentials:'same-origin',
@@ -485,6 +597,7 @@ document.querySelectorAll('nav a').forEach(a=>a.onclick=e=>{
   const v=a.dataset.v;
   document.querySelectorAll('section[data-view]').forEach(s=>s.classList.toggle('hidden',s.dataset.view!==v));
   $('greet').textContent=a.textContent.trim();
+  document.title='Payments — '+a.textContent.trim();
   $('subtitle').textContent={dash:'Ringkasan pemasukan seluruh aplikasi.',
     inv:'Setiap tagihan yang pernah dibuat.',clients:'Aplikasi yang memakai gateway ini.',
     provider:'Jalur pembayaran dan sesi.',
@@ -494,6 +607,10 @@ document.querySelectorAll('nav a').forEach(a=>a.onclick=e=>{
 });
 
 $('refresh').onclick=boot;
+$('refresh').addEventListener('click',()=>{
+  const b=$('refresh');b.classList.add('spin');
+  setTimeout(()=>b.classList.remove('spin'),900);
+});
 
 function tile(ico,cls,val,key){
   return `<div class="tile"><div class="ico ${cls}">${ICONS[ico]}</div>
@@ -575,7 +692,7 @@ async function boot(){
     <td><span class="pill p-${i.status}">${i.status}</span>${i.is_test?' <span class="pill p-EXPIRED">uji</span>':''}</td>
     <td class="mono">${i.provider}</td>
     <td class="num">${rp(i.payable_amount)}</td>
-    <td class="mono">${new Date(i.created_at).toLocaleString('id-ID',{dateStyle:'short',timeStyle:'short'})}</td>
+    <td class="mono" title="${new Date(i.created_at).toLocaleString('id-ID')}">${timeAgo(i.created_at)}</td>
     <td class="act">
       <button class="ib" onclick="syncInv('${i.id}')">Cek</button>
       ${i.status==='PENDING'?`<button class="ib" onclick="cancelInv('${i.id}')">Batal</button>`:''}
@@ -611,7 +728,7 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('.cp'); if(!b)return;
   const pre=b.parentElement.querySelector('pre');
   navigator.clipboard.writeText(pre.innerText).then(()=>{
-    const t=b.textContent; b.textContent='Tersalin'; setTimeout(()=>b.textContent=t,1400);
+    const t=b.textContent; b.textContent='Tersalin ✓'; setTimeout(()=>b.textContent=t,1400);
   });
 });
 $('modal').onclick=e=>{if(e.target===$('modal'))closeModal();};
@@ -675,18 +792,26 @@ async function editClient(id,name,cb,active){
     }catch(e){msg($('eMsg'),e.message,false);}
   };
   $('eRot').onclick=async()=>{
-    if(!confirm('Kunci lama akan langsung tidak berlaku. Lanjut?'))return;
-    try{
-      const d=await api('/hehehe/api/clients/'+id+'/rotate-key',{method:'POST'});
-      keyModal('Kunci diputar','Kunci lama sudah tidak berlaku. Simpan yang baru sekarang.',d.apiKey);
-    }catch(e){msg($('eMsg'),e.message,false);}
+    askConfirm({title:'Putar kunci '+id+'?',
+      body:'Kunci lama langsung tidak berlaku. Aplikasi yang memakainya akan terputus sampai kunci baru dipasang.',
+      okLabel:'Putar kunci',danger:true,
+      onOk:async()=>{
+        try{
+          const d=await api('/hehehe/api/clients/'+id+'/rotate-key',{method:'POST'});
+          keyModal('Kunci diputar','Kunci lama sudah tidak berlaku. Simpan yang baru sekarang.',d.apiKey);
+        }catch(e){msg($('eMsg'),e.message,false);}
+      }});
   };
 }
 
 async function delClient(id){
-  if(!confirm(`Hapus aplikasi ${id}?`))return;
-  try{await api('/hehehe/api/clients/'+id,{method:'DELETE'});boot();}
-  catch(e){alert(e.message);}
+  askConfirm({title:'Hapus aplikasi '+id+'?',
+    body:'Aplikasi yang masih memiliki invoice tidak bisa dihapus.',
+    okLabel:'Hapus',danger:true,
+    onOk:async()=>{
+      try{await api('/hehehe/api/clients/'+id,{method:'DELETE'});toast('Aplikasi '+id+' dihapus.');boot();}
+      catch(e){toast(e.message,false);}
+    }});
 }
 
 /**
@@ -908,19 +1033,25 @@ $('newInv').onclick=async()=>{
 };
 
 async function cancelInv(id){
-  if(!confirm('Batalkan invoice ini?'))return;
-  try{await api('/hehehe/api/invoices/'+id+'/cancel',{method:'POST'});boot();}
-  catch(e){alert(e.message);}
+  askConfirm({title:'Batalkan invoice ini?',
+    okLabel:'Batalkan',danger:true,
+    onOk:async()=>{
+      try{await api('/hehehe/api/invoices/'+id+'/cancel',{method:'POST'});toast('Invoice dibatalkan.');boot();}
+      catch(e){toast(e.message,false);}
+    }});
 }
 async function delInv(id){
-  if(!confirm('Hapus invoice ini permanen?'))return;
-  try{await api('/hehehe/api/invoices/'+id,{method:'DELETE'});boot();}
-  catch(e){alert(e.message);}
+  askConfirm({title:'Hapus invoice ini permanen?',
+    okLabel:'Hapus',danger:true,
+    onOk:async()=>{
+      try{await api('/hehehe/api/invoices/'+id,{method:'DELETE'});toast('Invoice dihapus.');boot();}
+      catch(e){toast(e.message,false);}
+    }});
 }
 async function syncInv(id){
   try{const d=await api('/hehehe/api/invoices/'+id+'/sync',{method:'POST'});
-    alert(`Status di provider: ${d.provider_status}. ${d.updated?'Invoice diperbarui menjadi PAID.':'Tidak ada perubahan.'}`);boot();}
-  catch(e){alert(e.message);}
+    toast(`Status di provider: ${d.provider_status}. ${d.updated?'Invoice kini PAID.':'Tidak ada perubahan.'}`,d.updated);}
+  catch(e){toast(e.message,false);}
 }
 async function testProv(id){
   try{const d=await api('/hehehe/api/providers/'+id+'/test',{method:'POST'});
@@ -1018,7 +1149,7 @@ async function loadTx(){
         <td class="num">${rp(t.amount)}${t.amount_source==='MINOR_UNIT'?' <span class="pill p-EXPIRED">satuan minor</span>':''}</td>
         <td class="mono">${t.order_id||'—'}${t.is_test?' <span class="pill p-EXPIRED">uji</span>':''}</td>
         <td>${t.client_name||'—'}</td>
-        <td class="mono">${new Date(t.claimed_at).toLocaleString('id-ID',{dateStyle:'short',timeStyle:'short'})}</td></tr>`),
+        <td class="mono" title="${new Date(t.claimed_at).toLocaleString('id-ID')}">${timeAgo(t.claimed_at)}</td></tr>`),
       'Belum ada mutasi yang diklaim.');
   }catch(e){$('txList').innerHTML=`<p class="empty">${e.message}</p>`;}
 }
@@ -1183,7 +1314,7 @@ async function loadSession(){
       <div class="kv"><span>Outlet</span><span>${d.outlet_name||'—'}</span></div>
       <div class="kv"><span>Refresh token</span><span>${d.has_refresh_token?'ada — sesi bisa diperpanjang':'TIDAK ADA — akan butuh OTP ulang'}</span></div>
       <div class="kv"><span>Token berlaku sampai</span><span>${exp.toLocaleString('id-ID')} (${jam} jam lagi)</span></div>
-      ${d.last_profile_error?`<div class="kv"><span>Profil gagal diambil</span><span style="color:#c02b6f">${d.last_profile_error}</span></div>`:''}`;
+      ${d.last_profile_error?`<div class="kv"><span>Profil gagal diambil</span><span style="color:var(--bad-ink)">${d.last_profile_error}</span></div>`:''}`;
   }catch(e){$('sessBox').innerHTML=`<p class="empty">${e.message}</p>`;}
 }
 
@@ -1209,11 +1340,15 @@ $('sTx').onclick=async()=>{
   }catch(e){msg($('sessMsg'),e.message,false);$('txBox').innerHTML='';}
 };
 
-$('wipeTest').onclick=async()=>{
-  if(!confirm('Hapus seluruh invoice bertanda uji? Yang berstatus PAID tetap dipertahankan.'))return;
-  try{const d=await api('/hehehe/api/invoices/test-data',{method:'DELETE'});
-    alert(`${d.deleted} invoice uji dihapus.`);boot();}
-  catch(e){alert(e.message);}
+$('wipeTest').onclick=()=>{
+  askConfirm({title:'Hapus seluruh data uji?',
+    body:'Invoice PAID tetap dipertahankan — itu catatan uang yang benar-benar masuk.',
+    okLabel:'Hapus uji',danger:true,
+    onOk:async()=>{
+      try{const d=await api('/hehehe/api/invoices/test-data',{method:'DELETE'});
+        toast(`${d.deleted} invoice uji dihapus.`);boot();}
+      catch(e){toast(e.message,false);}
+    }});
 };
 
 // ── Pengaturan ──
