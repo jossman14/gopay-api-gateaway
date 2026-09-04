@@ -161,6 +161,7 @@ section[data-view]:not(.hidden){animation:viewin .22s ease-out}
 .ib:hover{background:var(--violet-soft);color:var(--violet)}
 .ib:active{transform:scale(.95)}
 .ib.danger:hover{background:var(--pink-soft);color:var(--bad-ink)}
+.btn.danger{background:var(--pink)}
 .modal{position:fixed;inset:0;background:rgba(30,27,51,.42);display:none;z-index:50;
   padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch;backdrop-filter:blur(4px)}
 .modal.on{display:flex;align-items:flex-start;justify-content:center;
@@ -555,7 +556,7 @@ function askConfirm({title,body,okLabel='Lanjut',danger=false,onOk}){
     body:(body?'<p class="hint">'+body+'</p>':'')+
       '<div class="row" style="margin-top:0">'+
       '<button class="ib" data-close="1" style="min-height:36px">Batal</button>'+
-      '<button class="btn sm" id="cfOk"'+(danger?' style="background:var(--pink)':'')+'>'+esc(okLabel)+'</button></div>'});
+      '<button class="btn sm'+(danger?' danger':'')+'" id="cfOk">'+esc(okLabel)+'</button></div>'});
   $('cfOk').onclick=()=>{closeModal();onOk();};
 }
 

@@ -93,3 +93,21 @@ test('tombol ber-data-act punya delegasi kliknya', () => {
   // Delegasi menangkap tombol lewat closest(), jadi klik ikon di dalam
   // tombol pun sampai.
 });
+
+test('atribut HTML tidak ada yang petik gandanya menggantung', () => {
+  // Petik ganda yang lupa ditutup membuat parser menelan sisa markup sebagai
+  // nilai atribut: tombolnya hilang dari DOM tanpa satu pun galat. Itu yang
+  // pernah membuat semua konfirmasi berbahaya (putar kunci, hapus) mati.
+  const stray = [];
+  for (const m of HTML.matchAll(/<(?:button|input|select|option|div|a)\b/g)) {
+    let quoted = false;
+    let i = m.index + 1;
+    for (; i < HTML.length; i += 1) {
+      const ch = HTML[i];
+      if (ch === '"') quoted = !quoted;
+      else if (ch === '>' && !quoted) break;
+    }
+    if (i - m.index > 400) stray.push(HTML.slice(m.index, m.index + 90));
+  }
+  assert.deepEqual(stray, [], 'tag di atas tidak pernah ditutup — periksa petik gandanya');
+});
