@@ -2,46 +2,47 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Payments — Konsol</title>
 <style>
 :root{
-  --bg:#f4f2fb; --card:#fff; --ink:#1e1b33; --muted:#8b88a3; --line:#eceaf5;
-  --violet:#7c5cff; --violet-soft:#efeaff;
-  --green:#2bb673; --green-soft:#e3f7ee;
-  --amber:#f0a92e; --amber-soft:#fdf1dc;
-  --pink:#ef5da8; --pink-soft:#fde8f2;
+  --bg:#f4f2f8; --card:#fff; --ink:#1e1b33; --muted:#59566b; --line:#e5e2ee;
+  --violet:#5938d6; --violet-soft:#eeeaff;
+  --green:#188558; --green-soft:#e3f7ee;
+  --amber:#a66a05; --amber-soft:#fdf1dc;
+  --pink:#b92369; --pink-soft:#fde8f2;
   --r:18px; --shadow:0 1px 2px rgba(30,27,51,.04),0 8px 24px -12px rgba(30,27,51,.14);
-  --soft:#f7f6fc; --field:#fbfaff; --hover:rgba(124,92,255,.05);
-  --glow:rgba(124,92,255,.07);
-  --ok-ink:#177a4c; --bad-ink:#c02b6f; --warn-ink:#a9700d;
+  --soft:#f7f6fc; --field:#fbfaff; --hover:rgba(89,56,214,.06);
+  --glow:rgba(89,56,214,.12); --focus:#5938d6; --placeholder:#6d697b;
+  --ok-ink:#116b43; --bad-ink:#941a50; --warn-ink:#754900;
 }
 @media(prefers-color-scheme:dark){
   :root{
-    --bg:#0f0e17; --card:#171622; --ink:#e8e6f0; --muted:#8b88a3; --line:#262438;
-    --violet:#9d7fff; --violet-soft:#2a2544;
-    --green:#4ecb8b; --green-soft:#173226;
-    --amber:#f5b950; --amber-soft:#3a2f16;
-    --pink:#f97fc0; --pink-soft:#3c1a2e;
+    --bg:#0f0e17; --card:#171622; --ink:#f1eff7; --muted:#aaa6bb; --line:#343146;
+    --violet:#7657d9; --violet-soft:#2a2544;
+    --green:#70d8a5; --green-soft:#173226;
+    --amber:#f5c56d; --amber-soft:#3a2f16;
+    --pink:#fa92c9; --pink-soft:#3c1a2e;
     --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 24px -12px rgba(0,0,0,.55);
-    --soft:#232135; --field:#1d1b2e; --hover:rgba(157,127,255,.09);
-    --glow:rgba(157,127,255,.05);
-    --ok-ink:#6fd9a3; --bad-ink:#f97fc0; --warn-ink:#f5c069;
+    --soft:#232135; --field:#1d1b2e; --hover:rgba(173,149,255,.11);
+    --glow:rgba(173,149,255,.12); --focus:#c7baff; --placeholder:#b8b4c5;
+    --ok-ink:#84deb0; --bad-ink:#ff9dce; --warn-ink:#f5ca7d;
   }
   .modal{background:rgba(5,4,12,.62)}
   .code .cp{background:rgba(255,255,255,.16)}
 }
-html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:hidden}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 *{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
-body{margin:0;background:var(--bg);color:var(--ink);
+body{margin:0;background:var(--bg);color:var(--ink);overflow-x:hidden;
   font:14px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif}
 button{font:inherit;cursor:pointer;border:0;color:inherit}
-input{font:inherit;color:var(--ink)}
+input,select,textarea{font:inherit;color:var(--ink)}
 ::selection{background:var(--violet);color:#fff}
-button,a,input,select{transition-property:color,background-color,border-color,box-shadow,filter,transform,opacity;
+button,a,input,select,textarea{transition-property:color,background-color,border-color,box-shadow,filter,transform,opacity;
   transition-duration:.16s;transition-timing-function:ease-out}
-
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.app-inert{pointer-events:none;user-select:none}
 /* ── Login ─────────────────────────────────────────────── */
 #login{min-height:100vh;display:grid;place-items:center;padding:24px}
 .loginCard{background:var(--card);border-radius:24px;box-shadow:var(--shadow);
@@ -56,8 +57,8 @@ label{display:block;font-size:12.5px;color:var(--muted);margin:14px 0 6px;font-w
 .field{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:12px;
   background:var(--field);color:var(--ink);transition-property:border-color,box-shadow,background-color;
   transition-duration:.16s;transition-timing-function:ease-out}
-.field:focus{outline:0;border-color:var(--violet);box-shadow:0 0 0 3px var(--glow)}
-.field::placeholder{color:var(--muted);opacity:.55}
+.field:focus{outline:0;border-color:var(--focus);box-shadow:0 0 0 3px var(--glow)}
+.field::placeholder{color:var(--placeholder);opacity:1}
 .btn{background:var(--violet);color:#fff;padding:11px 18px;border-radius:12px;font-weight:600;
   transition-property:filter,transform,box-shadow;transition-duration:.16s;
   box-shadow:0 1px 2px rgba(124,92,255,.25),0 6px 18px -8px rgba(124,92,255,.45)}
@@ -77,7 +78,7 @@ label{display:block;font-size:12.5px;color:var(--muted);margin:14px 0 6px;font-w
 #app{display:none;min-height:100vh;padding:18px;gap:18px;grid-template-columns:224px 1fr}
 #app.on{display:grid}
 aside{background:var(--card);border-radius:22px;box-shadow:var(--shadow);padding:22px 16px;
-  height:calc(100vh - 36px);position:sticky;top:18px;display:flex;flex-direction:column}
+  height:calc(100vh - 36px);position:sticky;top:18px;display:flex;flex-direction:column;overflow-y:auto}
 nav{margin-top:22px;display:flex;flex-direction:column;gap:4px}
 nav a{display:flex;align-items:center;gap:11px;padding:10px 13px;border-radius:13px;
   color:var(--muted);text-decoration:none;font-weight:500;position:relative}
@@ -110,9 +111,7 @@ header.top p{margin:0;color:var(--muted);font-size:13.5px}
 .v-pink{background:var(--pink-soft);color:var(--pink)}
 
 .grid2{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
-@media(max-width:1000px){.grid2{grid-template-columns:1fr}#app{grid-template-columns:1fr}
-  aside{height:auto;position:static}}
-
+@media(max-width:1000px){.grid2{grid-template-columns:1fr}}
 .card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:20px;margin-bottom:18px;
   border:1px solid transparent}
 @media(prefers-color-scheme:dark){.card{border-color:var(--line)}}
@@ -120,9 +119,11 @@ header.top p{margin:0;color:var(--muted);font-size:13.5px}
 .card .hint{color:var(--muted);font-size:12.5px;margin:0 0 16px;text-wrap:pretty}
 .card h2+table,.card h2+.body{margin-top:16px}
 
+.table-scroll{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain}
+.table-scroll:focus-visible{outline-offset:4px;border-radius:8px}
 table{width:100%;border-collapse:collapse}
 th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);font-size:13.5px}
-th{color:var(--muted);font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+th{color:var(--muted);font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
 tbody tr{transition-property:background-color;transition-duration:.12s}
 tbody tr:hover{background:var(--hover)}
 tbody tr:last-child td{border-bottom:0}
@@ -155,9 +156,9 @@ section[data-view]:not(.hidden){animation:viewin .22s ease-out}
 .hidden{display:none!important}
 .kv{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
 .kv:last-child{border-bottom:0}
-.act{display:flex;gap:6px;justify-content:flex-end}
-.ib{padding:5px 10px;border-radius:9px;font-size:12px;font-weight:600;background:var(--soft);color:var(--muted);
-  min-height:29px;transition-property:background-color,color,transform}
+.act{display:flex;gap:6px;justify-content:flex-end;align-items:center}
+.ib{padding:7px 11px;border-radius:9px;font-size:12px;font-weight:600;background:var(--soft);color:var(--muted);
+  min-height:36px;transition-property:background-color,color,transform}
 .ib:hover{background:var(--violet-soft);color:var(--violet)}
 .ib:active{transform:scale(.95)}
 .ib.danger:hover{background:var(--pink-soft);color:var(--bad-ink)}
@@ -170,7 +171,7 @@ section[data-view]:not(.hidden){animation:viewin .22s ease-out}
    overflow, panduan yang panjang terpotong di luar layar tanpa jalan keluar. */
 .modal .box{background:var(--card);border-radius:20px;width:100%;max-width:440px;
   box-shadow:0 24px 70px -24px rgba(30,27,51,.45);margin:auto;
-  max-height:calc(100vh - 32px);display:flex;flex-direction:column;overflow:hidden}
+  max-height:calc(100dvh - 32px);display:flex;flex-direction:column;overflow:hidden}
 .modal.on .box{animation:pop .22s cubic-bezier(.2,.9,.3,1.2)}
 @keyframes fadein{from{opacity:0}to{opacity:1}}
 @keyframes pop{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
@@ -202,8 +203,9 @@ section[data-view]:not(.hidden){animation:viewin .22s ease-out}
 .code pre{margin:0;padding:14px 16px;overflow-x:auto;white-space:pre}
 .code .cp{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.12);color:#fff;
   font-size:11px;padding:4px 9px;border-radius:8px;opacity:0;transition:opacity .15s}
-.code:hover .cp{opacity:1}
+.code:hover .cp,.code:focus-within .cp{opacity:1}
 .code .cp:hover{background:rgba(255,255,255,.24)}
+@media(hover:none){.code .cp{opacity:1}}
 .tabs{display:flex;gap:6px;margin:0 0 10px;flex-wrap:wrap}
 .tabs button{padding:6px 13px;border-radius:9px;background:var(--soft);color:var(--muted);
   font-size:12.5px;font-weight:600}
@@ -213,8 +215,10 @@ section[data-view]:not(.hidden){animation:viewin .22s ease-out}
   display:grid;place-items:center;font-size:11.5px;font-weight:700;flex:none}
 .gstep b{font-size:14px}
 @media(max-width:560px){
-  .modal{padding:8px}
+  .modal{padding:0;align-items:flex-end}
+  .modal .box,.modal .box.wide{max-width:none;max-height:calc(100dvh - 12px);margin:auto 0 0;border-radius:18px 18px 0 0}
   .modal .box>.mhead,.modal .box>.mbody,.modal .box>.mfoot,.modal .box>.pad{padding-left:16px;padding-right:16px}
+  .modal .box>.mfoot{padding-bottom:max(14px,env(safe-area-inset-bottom))}
   .code pre{font-size:11px}
 }
 .head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:4px}
@@ -225,12 +229,12 @@ section[data-view]:not(.hidden){animation:viewin .22s ease-out}
 .step.ok .n{background:var(--green-soft);color:var(--ok-ink)}
 .step.now .n{background:var(--violet);color:#fff;box-shadow:0 0 0 4px var(--glow)}
 .step .t{flex:1;min-width:0}
-.step .t b{display:block;font-size:14px;font-weight:600}
-.step .t span{font-size:12.5px;color:var(--muted)}
-.step.now .t b{color:var(--violet)}
-.banner{background:linear-gradient(135deg,#7c5cff,#9d7fff);color:#fff;border-radius:var(--r);
+.banner{background:linear-gradient(135deg,#4e2fc0,#6847d6);color:#fff;border-radius:var(--r);
   padding:18px 20px;margin-bottom:18px;display:flex;justify-content:space-between;
   align-items:center;gap:16px;flex-wrap:wrap}
+.banner b{font-size:15px}
+.banner p{margin:3px 0 0;font-size:13px}
+.banner button{background:#fff;color:#4527b8}
 .banner b{font-size:15px}
 .banner p{margin:3px 0 0;opacity:.9;font-size:13px}
 .banner button{background:#fff;color:var(--violet)}
@@ -246,11 +250,78 @@ section[data-view]:not(.hidden){animation:viewin .22s ease-out}
 .toast.ok{border-left-color:var(--green)}
 .toast.bad{border-left-color:var(--pink)}
 .toast .tk{flex:1;min-width:0;text-wrap:pretty}
-.toast button{background:none;color:var(--muted);font-size:16px;padding:0 2px;min-width:24px;min-height:24px}
+.toast button{background:none;color:var(--muted);font-size:18px;padding:0 8px;min-width:44px;min-height:44px}
 .toast button:hover{color:var(--ink)}
+.tx-detail-row{cursor:pointer}
+.tx-detail-row:focus-visible{outline:2px solid var(--violet);outline-offset:-2px}
 .toast.out{animation:toastout .22s ease-in forwards}
 @keyframes toastin{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
 @keyframes toastout{to{opacity:0;transform:translateY(8px)}}
+
+/* ── Tablet & mobile console ───────────────────────────── */
+@media(max-width:900px){
+  #app.on{display:block;padding:10px 12px max(88px,calc(72px + env(safe-area-inset-bottom)));min-height:100dvh}
+  aside{height:56px;position:static;padding:0 2px 10px;background:transparent;box-shadow:none;
+    border-radius:0;display:flex;flex-direction:row;align-items:center;gap:10px}
+  aside .brand{margin:0;min-width:0}
+  aside .brand .logo{width:36px;height:36px;border-radius:10px}
+  aside .brand b{font-size:16px}
+  aside .spacer{display:block}
+  .who{padding:0;max-width:34vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;word-break:normal}
+  #logout{min-width:72px}
+  nav{position:fixed;z-index:40;left:0;right:0;bottom:0;margin:0;padding:7px 8px max(7px,env(safe-area-inset-bottom));
+    display:grid;grid-template-columns:repeat(7,minmax(64px,1fr));gap:4px;overflow-x:auto;overscroll-behavior-inline:contain;
+    background:var(--card);border-top:1px solid var(--line);box-shadow:0 -6px 22px rgba(30,27,51,.08)}
+  nav a{min-width:64px;min-height:52px;padding:6px 4px;border-radius:10px;justify-content:center;
+    flex-direction:column;gap:2px;font-size:11px;line-height:1.2;text-align:center;white-space:nowrap}
+  nav a svg{width:18px;height:18px}
+  nav a.on::before{left:24%;right:24%;top:-7px;bottom:auto;width:auto;height:3px}
+  main{width:100%;min-width:0;padding-bottom:0}
+  header.top{margin:4px 0 14px;align-items:flex-start}
+  header.top h1{font-size:21px}
+  header.top p{font-size:12.5px}
+  .card{padding:16px;margin-bottom:12px;border-radius:14px}
+  .tiles{gap:10px;margin-bottom:12px;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tile{padding:13px;min-width:0;border-radius:14px;gap:10px}
+  .tile .ico{width:38px;height:38px;border-radius:11px}
+  .tile .v{font-size:18px;overflow-wrap:anywhere}
+  .head{flex-wrap:wrap}
+  .head>div:first-child{flex:1 1 240px;min-width:0}
+  .head>.act{flex:1 1 100%;justify-content:flex-start;flex-wrap:wrap}
+  .head>.act .field{flex:1 1 130px;width:auto!important;min-width:0}
+  .row{align-items:stretch}
+  .row>.btn,.row>.ib{min-height:44px}
+  .btn.sm,.ib,.xbtn,.tabs button,.code .cp{min-height:44px}
+  .field{min-height:44px;font-size:16px}
+  .table-scroll{margin-top:12px;padding-bottom:2px}
+  .table-scroll table{min-width:680px}
+  .table-scroll th:first-child,.table-scroll td:first-child{position:sticky;left:0;z-index:1;background:var(--card)}
+  .table-scroll th:first-child{z-index:2}
+  .table-scroll td.act:last-child{position:sticky;right:0;z-index:1;background:var(--card);
+    box-shadow:-8px 0 10px -10px rgba(30,27,51,.45)}
+  .table-scroll th.actions{position:sticky;right:0;z-index:2;background:var(--card)}
+  .act{flex-wrap:wrap}
+  .kv{align-items:flex-start;overflow-wrap:anywhere}
+  .kv>span:last-child{text-align:right;min-width:0}
+  .banner{padding:16px;border-radius:14px}
+  #toasts{left:12px;right:12px;bottom:max(82px,calc(72px + env(safe-area-inset-bottom)));max-width:none}
+}
+@media(max-width:420px){
+  #app.on{padding-left:10px;padding-right:10px}
+  .who{max-width:72px}
+  header.top{gap:10px}
+  header.top>div{min-width:0}
+  header.top p{max-width:210px}
+  .tiles{grid-template-columns:1fr}
+  .tile .v{font-size:20px}
+  .head>.act>.btn,.head>.act>.ib{flex:1 1 120px}
+  #setupCard .steps{display:grid;grid-template-columns:1fr}
+  .step{flex-wrap:wrap}
+  .step .ib{margin-left:38px}
+  .row>.btn,.row>.ib{flex:1 1 130px}
+  #logout{min-height:44px;padding-inline:12px}
+  .loginCard{padding:28px 20px;border-radius:18px}
+}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
 }
@@ -279,7 +350,7 @@ section[data-view]:not(.hidden){animation:viewin .22s ease-out}
 <div id="app">
   <aside>
     <div class="brand"><div class="logo">₽</div><b>Payments</b></div>
-    <nav>
+    <nav aria-label="Navigasi utama">
       <a href="#dash" class="on" data-v="dash">Dashboard</a>
       <a href="#inv" data-v="inv">Invoice</a>
       <a href="#clients" data-v="clients">Aplikasi</a>
@@ -390,12 +461,12 @@ section[data-view]:not(.hidden){animation:viewin .22s ease-out}
         <div class="steps"><span id="s1" class="on">1 · Nomor HP</span><span id="s2">2 · Kode OTP</span><span id="s3">3 · Selesai</span></div>
         <div id="step1">
           <label for="phone">Nomor HP GoBiz</label>
-          <input id="phone" class="field" inputmode="numeric" placeholder="081234567890">
+          <input id="phone" class="field" type="tel" inputmode="tel" autocomplete="tel" placeholder="081234567890">
           <div class="row"><button class="btn sm" id="reqOtp">Kirim OTP</button></div>
         </div>
         <div id="step2" class="hidden">
           <label for="otp">Kode OTP</label>
-          <input id="otp" class="field" inputmode="numeric" maxlength="6" placeholder="1234">
+          <input id="otp" class="field" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="1234">
           <div class="row"><button class="btn sm" id="verify">Verifikasi</button>
             <button class="btn ghost sm" id="back">Ganti nomor</button></div>
         </div>
@@ -499,9 +570,11 @@ section[data-view]:not(.hidden){animation:viewin .22s ease-out}
   </main>
 </div>
 
-<div class="modal" id="modal"><div class="box" id="modalBox"></div></div>
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-hidden="true">
+  <div class="box" id="modalBox" tabindex="-1"></div>
+</div>
 
-<div id="toasts"></div>
+<div id="toasts" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <script>
 const ICONS={
@@ -542,7 +615,8 @@ function msg(el,t,ok){el.textContent=t;el.className='msg show '+(ok?'ok':'bad');
 function toast(t,ok=true,ms=4200){
   const d=document.createElement('div');
   d.className='toast '+(ok?'ok':'bad');
-  d.innerHTML='<div class="tk">'+esc(t)+'</div><button aria-label="Tutup">&times;</button>';
+  d.setAttribute('role',ok?'status':'alert');
+  d.innerHTML='<div class="tk">'+esc(t)+'</div><button aria-label="Tutup notifikasi">&times;</button>';
   const kill=()=>{d.classList.add('out');setTimeout(()=>d.remove(),240)};
   d.querySelector('button').onclick=kill;
   $('toasts').appendChild(d);
@@ -553,7 +627,7 @@ function toast(t,ok=true,ms=4200){
 /** Konfirmasi lewat modal, bukan confirm() yang memblokir dan tidak bisa distyle. */
 function askConfirm({title,body,okLabel='Lanjut',danger=false,onOk}){
   openSheet({title,
-    body:(body?'<p class="hint">'+body+'</p>':'')+
+    body:(body?'<p class="hint">'+esc(body)+'</p>':'')+
       '<div class="row" style="margin-top:0">'+
       '<button class="ib" data-close="1" style="min-height:36px">Batal</button>'+
       '<button class="btn sm'+(danger?' danger':'')+'" id="cfOk">'+esc(okLabel)+'</button></div>'});
@@ -564,7 +638,7 @@ async function api(path,opts={}){
   const res=await fetch(path,{credentials:'same-origin',
     headers:{'content-type':'application/json',...(opts.headers||{})},...opts});
   const b=await res.json().catch(()=>({}));
-  if(res.status===401){show(false);throw new Error('Sesi berakhir, silakan masuk lagi.');}
+  if(res.status===401){resetSessionUi();throw new Error('Sesi berakhir, silakan masuk lagi.');}
   if(!res.ok||b.success===false)throw new Error(b?.errors?.[0]?.message||('HTTP '+res.status));
   return b.data;
 }
@@ -572,6 +646,16 @@ async function api(path,opts={}){
 function show(loggedIn){
   $('login').style.display=loggedIn?'none':'grid';
   $('app').classList.toggle('on',loggedIn);
+}
+function resetSessionUi(){
+  if(typeof stopPoll==='function')stopPoll();
+  if($('modal').classList.contains('on'))closeModal();
+  $('modalBox').replaceChildren();
+  ['qImage','qTags','txLiveList','txBox','sessBox','otpMsg'].forEach(id=>{const el=$(id);if(el)el.replaceChildren();});
+  window._clients=[];window._invoices=[];window._tx=[];qLast=null;otpToken=null;
+  $('pass').value='';
+  show(false);
+  requestAnimationFrame(()=>$('email').focus());
 }
 
 $('loginForm').onsubmit=async e=>{
@@ -587,15 +671,18 @@ $('loginForm').onsubmit=async e=>{
 };
 
 $('logout').onclick=async()=>{
-  await fetch('/hehehe/api/logout',{method:'POST',credentials:'same-origin'});
-  show(false);
+  try{await fetch('/hehehe/api/logout',{method:'POST',credentials:'same-origin'});}
+  finally{resetSessionUi();}
 };
 
 document.querySelectorAll('nav a').forEach(a=>a.onclick=e=>{
   e.preventDefault();
   document.querySelectorAll('nav a').forEach(x=>x.classList.remove('on'));
   a.classList.add('on');
+  a.setAttribute('aria-current','page');
+  document.querySelectorAll('nav a').forEach(x=>{if(x!==a)x.removeAttribute('aria-current');});
   const v=a.dataset.v;
+  if(location.hash!=='#'+v)history.replaceState(null,'','#'+v);
   document.querySelectorAll('section[data-view]').forEach(s=>s.classList.toggle('hidden',s.dataset.view!==v));
   $('greet').textContent=a.textContent.trim();
   document.title='Payments — '+a.textContent.trim();
@@ -614,13 +701,16 @@ $('refresh').addEventListener('click',()=>{
 });
 
 function tile(ico,cls,val,key){
-  return `<div class="tile"><div class="ico ${cls}">${ICONS[ico]}</div>
-    <div><div class="v">${val}</div><div class="k">${key}</div></div></div>`;
+  return `<div class="tile"><div class="ico ${esc(cls)}">${ICONS[ico]||''}</div>
+    <div><div class="v">${esc(val)}</div><div class="k">${esc(key)}</div></div></div>`;
 }
-
 function table(head,rows,empty){
-  if(!rows.length)return `<p class="empty">${empty}</p>`;
-  return `<table><thead><tr>${head}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
+  if(!rows.length)return `<p class="empty">${esc(empty)}</p>`;
+  return `<div class="table-scroll" tabindex="0" role="region" aria-label="Tabel data, geser secara horizontal untuk melihat seluruh kolom"><table><thead><tr>${head}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+}
+function statusClass(status){
+  const value=String(status||'').toUpperCase();
+  return ['PENDING','PAID','EXPIRED','CANCELLED','FAILED'].includes(value)?value:'EXPIRED';
 }
 
 function chart(daily){
@@ -656,30 +746,29 @@ async function boot(){
   $('chart').innerHTML=chart(rev.daily||[]);
   loadRecon().catch(()=>{});
   loadSetup().catch(()=>{});
-
   $('byClient').innerHTML=table('<th>Aplikasi</th><th class="num">Lunas</th><th class="num">Pemasukan</th>',
-    (rev.by_client||[]).map(c=>`<tr><td>${c.name}</td><td class="num">${c.paid_count}</td>
+    (rev.by_client||[]).map(c=>`<tr><td>${esc(c.name)}</td><td class="num">${Number(c.paid_count)||0}</td>
       <td class="num">${rp(c.gross_amount)}</td></tr>`),'Belum ada aplikasi.');
 
   $('byProvider').innerHTML=table('<th>Provider</th><th class="num">Lunas</th><th class="num">Nilai</th>',
-    (rev.by_provider||[]).map(p=>`<tr><td class="mono">${p.provider}</td><td class="num">${p.paid_count}</td>
+    (rev.by_provider||[]).map(p=>`<tr><td class="mono">${esc(p.provider)}</td><td class="num">${Number(p.paid_count)||0}</td>
       <td class="num">${rp(p.gross_amount)}</td></tr>`),'Belum ada pembayaran lunas.');
 
   $('providers').innerHTML=(provs.detail||[]).map(p=>`
-    <div class="kv"><span><b>${p.id}</b>${p.id===provs.default?' · default':''}<br>
+    <div class="kv"><span><b>${esc(p.id)}</b>${p.id===provs.default?' · default':''}<br>
       <span style="font-size:12px">${p.supports_webhook?'webhook':'polling'}${p.needs_unique_amount?' · nominal unik':''}</span></span>
-    <button class="ib" onclick="testProv('${p.id}')">Uji koneksi</button></div>`).join('')
+    <button class="ib" data-provider-id="${esc(p.id)}">Uji koneksi</button></div>`).join('')
     ||'<p class="empty">Belum ada provider aktif. Aktifkan di Pengaturan.</p>';
 
   window._clients=cls.clients||[];
   $('clients').innerHTML=table('<th>Aplikasi</th><th>ID</th><th>Prefix</th><th>Status</th><th></th>',
-    (cls.clients||[]).map(c=>`<tr><td>${c.name}</td><td class="mono">${c.id}</td>
-      <td class="mono">${c.api_key_prefix}</td>
+    (cls.clients||[]).map(c=>`<tr><td>${esc(c.name)}</td><td class="mono">${esc(c.id)}</td>
+      <td class="mono">${esc(c.api_key_prefix)}</td>
       <td><span class="pill ${c.active?'p-PAID':'p-EXPIRED'}">${c.active?'aktif':'nonaktif'}</span></td>
       <td class="act">
-        <button class="ib" data-act="guide" data-id="${c.id}">Panduan</button>
-        <button class="ib" data-act="edit" data-id="${c.id}">Ubah</button>
-        <button class="ib danger" data-act="del" data-id="${c.id}">Hapus</button></td></tr>`),
+        <button class="ib" data-act="guide" data-id="${esc(c.id)}">Panduan</button>
+        <button class="ib" data-act="edit" data-id="${esc(c.id)}">Ubah</button>
+        <button class="ib danger" data-act="del" data-id="${esc(c.id)}">Hapus</button></td></tr>`),
     'Belum ada aplikasi terdaftar.');
 
   loadSettings().catch(()=>{});
@@ -688,46 +777,79 @@ async function boot(){
   loadQrisConfig().catch(()=>{});
 
   const inv=await api('/hehehe/api/invoices?limit=100').catch(()=>({invoices:[]}));
-  const rows=(inv.invoices||[]).map(i=>`<tr>
-    <td class="mono">${i.order_id}</td><td>${i.client_name||i.client_id}</td>
-    <td><span class="pill p-${i.status}">${i.status}</span>${i.is_test?' <span class="pill p-EXPIRED">uji</span>':''}</td>
-    <td class="mono">${i.provider}</td>
+  window._invoices=inv.invoices||[];
+  const rows=window._invoices.map(i=>`<tr>
+    <td class="mono">${esc(i.order_id)}</td><td>${esc(i.client_name||i.client_id)}</td>
+    <td><span class="pill p-${statusClass(i.status)}">${esc(i.status)}</span>${i.is_test?' <span class="pill p-EXPIRED">uji</span>':''}</td>
+    <td class="mono">${esc(i.provider)}</td>
     <td class="num">${rp(i.payable_amount)}</td>
-    <td class="mono" title="${new Date(i.created_at).toLocaleString('id-ID')}">${timeAgo(i.created_at)}</td>
+    <td class="mono" title="${esc(new Date(i.created_at).toLocaleString('id-ID'))}">${esc(timeAgo(i.created_at))}</td>
     <td class="act">
-      <button class="ib" onclick="syncInv('${i.id}')">Cek</button>
-      ${i.status==='PENDING'?`<button class="ib" onclick="cancelInv('${i.id}')">Batal</button>`:''}
-      ${i.status!=='PAID'?`<button class="ib danger" onclick="delInv('${i.id}')">Hapus</button>`:''}
+      <button class="ib" data-invoice-act="sync" data-id="${esc(i.id)}">Cek</button>
+      ${i.status==='PENDING'?`<button class="ib" data-invoice-act="cancel" data-id="${esc(i.id)}">Batal</button>`:''}
+      ${i.status!=='PAID'?`<button class="ib danger" data-invoice-act="delete" data-id="${esc(i.id)}">Hapus</button>`:''}
     </td></tr>`);
-  const head='<th>Order</th><th>Aplikasi</th><th>Status</th><th>Provider</th><th class="num">Nominal</th><th>Dibuat</th><th></th>';
+  const head='<th>Order</th><th>Aplikasi</th><th>Status</th><th>Provider</th><th class="num">Nominal</th><th>Dibuat</th><th class="actions"><span class="sr-only">Aksi</span></th>';
   $('invoices').innerHTML=table(head,rows,'Belum ada invoice.');
   $('recent').innerHTML=table(head,rows.slice(0,6),'Belum ada invoice.');
 }
 
 // ── Modal ──
-function openModal(html){
-  $('modalBox').className='box';
-  $('modalBox').innerHTML='<div class="pad">'+html+'</div>';
+let lastModalFocus=null;
+function focusModal(){
+  const wasOpen=$('modal').classList.contains('on');
+  if(!wasOpen)lastModalFocus=document.activeElement;
   $('modal').classList.add('on');
+  $('modal').setAttribute('aria-hidden','false');
+  const background=$('app').classList.contains('on')?$('app'):$('login');
+  background.setAttribute('inert','');
+  background.setAttribute('aria-hidden','true');
+  requestAnimationFrame(()=>{
+    const target=$('modalBox').querySelector('input,select,textarea,button,[href]')||$('modalBox');
+    target.focus();
+  });
+}
+function openModal(title,html){
+  $('modalBox').className='box';
+  $('modalBox').innerHTML='<div class="pad"><h2 id="modalTitle" class="sr-only">'+esc(title)+'</h2>'+html+'</div>';
+  focusModal();
 }
 /** Modal terstruktur: kepala tetap, isi bergulir, kaki tetap. */
 function openSheet({title,hint,body,foot,wide}){
   $('modalBox').className='box'+(wide?' wide':'');
   $('modalBox').innerHTML=
-    '<div class="mhead"><div><h3>'+title+'</h3>'+(hint?'<p class="hint" style="margin:0">'+hint+'</p>':'')+'</div>'+
+    '<div class="mhead"><div><h3 id="modalTitle">'+esc(title)+'</h3>'+(hint?'<p class="hint" style="margin:0">'+esc(hint)+'</p>':'')+'</div>'+
     '<button class="xbtn" data-close="1" aria-label="Tutup">&times;</button></div>'+
     '<div class="mbody">'+body+'</div>'+
     (foot?'<div class="mfoot">'+foot+'</div>':'');
-  $('modal').classList.add('on');
+  focusModal();
 }
-function closeModal(){$('modal').classList.remove('on');}
-// Tombol tutup dan tombol berdata-close mana pun.
-document.addEventListener('click',e=>{ if(e.target.closest('[data-close]')) closeModal(); });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+function closeModal(){
+  if(!$('modal').classList.contains('on'))return;
+  $('modal').classList.remove('on');
+  $('modal').setAttribute('aria-hidden','true');
+  [$('app'),$('login')].forEach(el=>{el.removeAttribute('inert');el.removeAttribute('aria-hidden');});
+  if(lastModalFocus&&document.contains(lastModalFocus))lastModalFocus.focus();
+  lastModalFocus=null;
+  $('modalBox').replaceChildren();
+  $('modalBox').className='box';
+}
+document.addEventListener('click',e=>{if(e.target.closest('[data-close]'))closeModal();});
+document.addEventListener('keydown',e=>{
+  if(!$('modal').classList.contains('on'))return;
+  if(e.key==='Escape'){closeModal();return;}
+  if(e.key!=='Tab')return;
+  const f=[...$('modalBox').querySelectorAll('button:not(:disabled),[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex]:not([tabindex="-1"])')];
+  if(!f.length){e.preventDefault();$('modalBox').focus();return;}
+  const first=f[0],last=f[f.length-1];
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+});
 /** Menyalin dari elemen <code> terdekat. */
 document.addEventListener('click',e=>{
   const b=e.target.closest('.cp'); if(!b)return;
-  const pre=b.parentElement.querySelector('pre');
+  const code=b.closest('.code');
+  const pre=code&&code.querySelector('pre'); if(!pre)return;
   navigator.clipboard.writeText(pre.innerText).then(()=>{
     const t=b.textContent; b.textContent='Tersalin ✓'; setTimeout(()=>b.textContent=t,1400);
   });
@@ -745,17 +867,43 @@ document.addEventListener('click',e=>{
   else if(b.dataset.act==='del')delClient(id);
 });
 
+document.addEventListener('click',e=>{
+  const p=e.target.closest('[data-provider-id]');
+  if(p){testProv(p.dataset.providerId);return;}
+  const b=e.target.closest('[data-invoice-act]');
+  if(!b)return;
+  if(b.dataset.invoiceAct==='sync')syncInv(b.dataset.id);
+  else if(b.dataset.invoiceAct==='cancel')cancelInv(b.dataset.id);
+  else if(b.dataset.invoiceAct==='delete')delInv(b.dataset.id);
+});
+
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-goto-view]');
+  if(b)gotoView(b.dataset.gotoView);
+});
+
+function openTxDetailFromEvent(e){
+  const row=e.target.closest('[data-tx-index]');
+  if(!row)return;
+  if(e.type==='keydown'&&!['Enter',' '].includes(e.key))return;
+  if(e.type==='keydown')e.preventDefault();
+  txDetail(Number(row.dataset.txIndex));
+}
+document.addEventListener('click',openTxDetailFromEvent);
+document.addEventListener('keydown',openTxDetailFromEvent);
+
 function keyModal(title,note,key){
-  openModal(`<h3>${title}</h3><p class="hint">${note}</p>
-    <div class="keybox">${key}</div>
-    <div class="row"><button class="btn" onclick="navigator.clipboard.writeText('${key}').then(()=>this.textContent='Tersalin')">Salin</button>
+  openModal(title,`<h3>${esc(title)}</h3><p class="hint">${esc(note)}</p>
+    <div class="keybox">${esc(key)}</div>
+    <div class="row"><button class="btn" id="copyKey">Salin</button>
     <button class="btn ghost" id="mClose">Tutup</button></div>`);
+  $('copyKey').onclick=()=>navigator.clipboard.writeText(String(key)).then(()=>$('copyKey').textContent='Tersalin');
   $('mClose').onclick=closeModal;
 }
 
 // ── CRUD aplikasi ──
 $('newClient').onclick=()=>{
-  openModal(`<h3>Aplikasi baru</h3><p class="hint">ID dipakai sebagai pengenal tetap dan tidak bisa diubah.</p>
+  openModal('Aplikasi baru',`<h3>Aplikasi baru</h3><p class="hint">ID dipakai sebagai pengenal tetap dan tidak bisa diubah.</p>
     <label>ID</label><input id="cId" class="field" placeholder="soal">
     <label>Nama</label><input id="cName" class="field" placeholder="Soal — tryout">
     <label>Callback URL</label><input id="cCb" class="field" placeholder="https://soal.nusawangsa.com/api/payment/webhook">
@@ -773,7 +921,7 @@ $('newClient').onclick=()=>{
 };
 
 async function editClient(id,name,cb,active){
-  openModal(`<h3>Ubah aplikasi</h3><p class="hint">ID <code>${id}</code> tidak bisa diubah.</p>
+  openModal('Ubah aplikasi',`<h3>Ubah aplikasi</h3><p class="hint">ID <code>${esc(id)}</code> tidak bisa diubah.</p>
     <label>Nama</label><input id="eName" class="field" value="${esc(name)}">
     <label>Callback URL</label><input id="eCb" class="field" value="${esc(cb||'')}">
     <label>Status</label><select id="eAct" class="field">
@@ -996,10 +1144,10 @@ function guideClient(id, cb) {
   const show = () => {
     openSheet({
       wide: true,
-      title: 'Integrasi — ' + esc(id),
+      title: 'Integrasi — ' + id,
       hint: 'Kunci API tidak ditampilkan di sini; ia hanya muncul sekali saat dibuat atau diputar.',
       body: render(),
-      foot: '<button class="btn ghost" onclick="window.open(\'https://bayar.nusawangsa.com/hehehe/docs\',\'_blank\')">Dokumentasi lengkap</button>' +
+      foot: '<a class="btn ghost" href="/hehehe/docs" target="_blank" rel="noopener">Dokumentasi lengkap</a>' +
             '<button class="btn ghost" data-close="1">Tutup</button>',
     });
     $('modalBox').querySelectorAll('[data-lang]').forEach((b) => {
@@ -1013,7 +1161,7 @@ function guideClient(id, cb) {
 $('newInv').onclick=async()=>{
   const cls=await api('/hehehe/api/clients');
   const provs=await api('/hehehe/api/providers');
-  openModal(`<h3>Invoice baru</h3><p class="hint">order_id bersifat idempoten per aplikasi.</p>
+  openModal('Invoice baru',`<h3>Invoice baru</h3><p class="hint">order_id bersifat idempoten per aplikasi.</p>
     <label>Aplikasi</label><select id="iCl" class="field">${
       (cls.clients||[]).filter(c=>c.active).map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select>
     <label>Order ID</label><input id="iOrd" class="field" placeholder="INV-2026-001">
@@ -1078,20 +1226,20 @@ async function loadSetup(){
       const n=d.berikutnya;
       $('setupBanner').innerHTML=`<div class="banner">
         <div><b>Belum siap menerima pembayaran</b>
-          <p>${d.selesai} dari ${d.total} langkah selesai. Berikutnya: ${n?n.label:'—'}${n&&n.detail?` — ${n.detail}`:''}</p></div>
-        ${n?`<button class="btn sm" onclick="gotoView('${n.view}')">Ke ${n.aksi}</button>`:''}
+          <p>${Number(d.selesai)||0} dari ${Number(d.total)||0} langkah selesai. Berikutnya: ${n?esc(n.label):'—'}${n&&n.detail?` — ${esc(n.detail)}`:''}</p></div>
+        ${n?`<button class="btn sm" data-goto-view="${esc(n.view)}">Ke ${esc(n.aksi)}</button>`:''}
       </div>`;
       $('setupCard').style.display='block';
     }
 
     let sampai=false;
-    $('setupSteps').innerHTML=d.langkah.map((l,i)=>{
+    $('setupSteps').innerHTML=(d.langkah||[]).map((l,i)=>{
       const kini=!l.selesai&&!sampai&&l.wajib!==false;
       if(kini)sampai=true;
       return `<div class="step ${l.selesai?'ok':''} ${kini?'now':''}">
         <div class="n">${l.selesai?'✓':i+1}</div>
-        <div class="t"><b>${l.label}</b><span>${l.detail}</span></div>
-        ${l.selesai?'':`<button class="ib" onclick="gotoView('${l.view}')">${l.aksi}</button>`}
+        <div class="t"><b>${esc(l.label)}</b><span>${esc(l.detail)}</span></div>
+        ${l.selesai?'':`<button class="ib" data-goto-view="${esc(l.view)}">${esc(l.aksi)}</button>`}
       </div>`;
     }).join('');
   }catch(e){ $('setupBanner').innerHTML=''; }
@@ -1104,25 +1252,25 @@ async function loadRecon(){
     const d=await api('/hehehe/api/reconciliation/summary?days=30');
     const m=d.merchant;
     if(!m){ $('recon').innerHTML='<p class="empty">Provider gopay tidak aktif.</p>'; return; }
-    if(m.error){ $('recon').innerHTML=`<p class="empty">Tidak bisa membaca mutasi merchant: ${m.error}</p>`; return; }
+    if(m.error){ $('recon').innerHTML=`<p class="empty">Tidak bisa membaca mutasi merchant: ${esc(m.error)}</p>`; return; }
     const bt=d.belum_terkait||{count:0,amount:0};
+    const claimed=d.diklaim||{count:0,amount:0};
     const adaSelisih=bt.count>0||bt.amount>0;
     $('recon').innerHTML=`
       <div class="tiles" style="margin:0">
-        ${tile('money','v-green',rp(m.settled_amount),`Diterima merchant · ${m.settled_count} mutasi`)}
-        ${tile('check','v-violet',rp(d.diklaim.amount),`Terkait pesanan · ${d.diklaim.count} mutasi`)}
-        ${tile('clock',adaSelisih?'v-amber':'v-green',rp(bt.amount),`Belum terkait · ${bt.count} mutasi`)}
-        ${tile('doc','v-pink',m.unsettled_count,'Tidak diterima (batal/kedaluwarsa)')}
+        ${tile('money','v-green',rp(m.settled_amount),`Diterima merchant · ${Number(m.settled_count)||0} mutasi`)}
+        ${tile('check','v-violet',rp(claimed.amount),`Terkait pesanan · ${Number(claimed.count)||0} mutasi`)}
+        ${tile('clock',adaSelisih?'v-amber':'v-green',rp(bt.amount),`Belum terkait · ${Number(bt.count)||0} mutasi`)}
+        ${tile('doc','v-pink',Number(m.unsettled_count)||0,'Tidak diterima (batal/kedaluwarsa)')}
       </div>
       ${adaSelisih?`<p class="hint" style="margin-top:14px">
-        Ada <b>${rp(bt.amount)}</b> dari ${bt.count} mutasi yang masuk ke merchant tapi tidak
+        Ada <b>${rp(bt.amount)}</b> dari ${Number(bt.count)||0} mutasi yang masuk ke merchant tapi tidak
         terhubung ke tagihan mana pun — biasanya pembayaran di luar gateway, atau tagihan yang
         sudah kedaluwarsa saat pembeli membayar.</p>`
         :'<p class="hint" style="margin-top:14px">Seluruh uang yang diterima sudah terkait pesanan.</p>'}
       <p class="hint">Rentang 30 hari terakhir.</p>`;
-  }catch(e){ $('recon').innerHTML=`<p class="empty">${e.message}</p>`; }
+  }catch(e){ $('recon').innerHTML=`<p class="empty">${esc(e.message)}</p>`; }
 }
-
 // ── QRIS terkonfigurasi ──
 async function loadQrisConfig(){
   try{
@@ -1134,8 +1282,8 @@ async function loadQrisConfig(){
       return;
     }
     $('qConfigured').innerHTML=`<div class="msg show ${d.valid?'ok':'bad'}" style="margin:0 0 12px">
-      Memakai QRIS tersimpan: <b>${d.merchant_name||'(tanpa nama)'}</b>${d.merchant_city?' · '+d.merchant_city:''}
-      · ${d.length} karakter${d.valid?'':' — '+(d.problems||[]).join(' ')}</div>`;
+      Memakai QRIS tersimpan: <b>${esc(d.merchant_name||'(tanpa nama)')}</b>${d.merchant_city?' · '+esc(d.merchant_city):''}
+      · ${Number(d.length)||0} karakter${d.valid?'':' — '+esc((d.problems||[]).join(' '))}</div>`;
   }catch(e){ $('qConfigured').innerHTML=''; }
 }
 
@@ -1145,14 +1293,14 @@ async function loadTx(){
     const d=await api('/hehehe/api/transactions');
     $('txList').innerHTML=table(
       '<th>ID mutasi</th><th class="num">Nominal</th><th>Dipakai invoice</th><th>Aplikasi</th><th>Waktu klaim</th>',
-      d.transactions.map(t=>`<tr>
-        <td class="mono">${t.provider_transaction_id}</td>
+      (d.transactions||[]).map(t=>`<tr>
+        <td class="mono">${esc(t.provider_transaction_id)}</td>
         <td class="num">${rp(t.amount)}${t.amount_source==='MINOR_UNIT'?' <span class="pill p-EXPIRED">satuan minor</span>':''}</td>
-        <td class="mono">${t.order_id||'—'}${t.is_test?' <span class="pill p-EXPIRED">uji</span>':''}</td>
-        <td>${t.client_name||'—'}</td>
-        <td class="mono" title="${new Date(t.claimed_at).toLocaleString('id-ID')}">${timeAgo(t.claimed_at)}</td></tr>`),
+        <td class="mono">${esc(t.order_id||'—')}${t.is_test?' <span class="pill p-EXPIRED">uji</span>':''}</td>
+        <td>${esc(t.client_name||'—')}</td>
+        <td class="mono" title="${esc(new Date(t.claimed_at).toLocaleString('id-ID'))}">${esc(timeAgo(t.claimed_at))}</td></tr>`),
       'Belum ada mutasi yang diklaim.');
-  }catch(e){$('txList').innerHTML=`<p class="empty">${e.message}</p>`;}
+  }catch(e){$('txList').innerHTML=`<p class="empty">${esc(e.message)}</p>`;}
 }
 $('txReload').onclick=loadTx;
 
@@ -1165,16 +1313,18 @@ $('txLive').onclick=async()=>{
       (st?`&statuses=${encodeURIComponent(st)}`:''));
     $('txLiveList').innerHTML=d.count?table(
       '<th>ID mutasi</th><th>Status</th><th class="num">Nominal</th><th>Waktu</th>',
-      d.transactions.map((t,idx)=>`<tr style="cursor:pointer" onclick="txDetail(${idx})">
-        <td class="mono">${t.id.slice(0,18)}…</td>
-        <td><span class="pill ${t.settled?'p-PAID':'p-CANCELLED'}">${t.status||'—'}</span></td>
-        <td class="num">${rp(t.amount)}<br><span style="font-size:11px;color:var(--muted)">dilaporkan ${t.amount_raw} ÷ ${t.amount_scale}</span></td>
-        <td class="mono">${t.transaction_time||'—'}</td></tr>`),'')
-      :`<p class="empty">Tidak ada mutasi dalam ${d.days} hari terakhir.</p>`;
-    window._tx=d.transactions;
-    const diterima=d.transactions.filter(t=>t.settled).length;
-    msg($('txMsg'),`${d.count} mutasi dalam ${d.days} hari. ${diterima} diterima, `+
-      `${d.count-diterima} tidak — yang tidak diterima tidak akan pernah melunasi invoice.`,true);
+      (d.transactions||[]).map((t,idx)=>`<tr class="tx-detail-row" tabindex="0" data-tx-index="${idx}" aria-label="Buka detail mutasi ${esc(t.id)}">
+        <td class="mono">${esc(String(t.id||'').slice(0,18))}…</td>
+        <td><span class="pill ${t.settled?'p-PAID':'p-CANCELLED'}">${esc(t.status||'—')}</span></td>
+        <td class="num">${rp(t.amount)}<br><span style="font-size:11px;color:var(--muted)">dilaporkan ${esc(t.amount_raw)} ÷ ${esc(t.amount_scale)}</span></td>
+        <td class="mono">${esc(t.transaction_time||'—')}</td></tr>`),'')
+      :`<p class="empty">Tidak ada mutasi dalam ${Number(d.days)||0} hari terakhir.</p>`;
+    const transactions=d.transactions||[];
+    window._tx=transactions;
+    const diterima=transactions.filter(t=>t.settled).length;
+    const count=Number(d.count)||0;
+    msg($('txMsg'),`${count} mutasi dalam ${Number(d.days)||0} hari. ${diterima} diterima, `+
+      `${count-diterima} tidak — yang tidak diterima tidak akan pernah melunasi invoice.`,true);
   }catch(e){msg($('txMsg'),e.message,false);}
   finally{$('txLive').disabled=false;}
 };
@@ -1183,23 +1333,23 @@ function txDetail(i){
   const t=(window._tx||[])[i]; if(!t)return;
   const dt=t.detail||{};
   const hist=(dt.history||[]).map(h=>`<div class="kv">
-    <span>${h.action_name||h.action||h.status||'perubahan'}</span>
-    <span class="mono" style="font-size:11px">${h.action_time||h.time||'—'}</span></div>`).join('')
+    <span>${esc(h.action_name||h.action||h.status||'perubahan')}</span>
+    <span class="mono" style="font-size:11px">${esc(h.action_time||h.time||'—')}</span></div>`).join('')
     ||'<p class="empty">Tidak ada linimasa.</p>';
-  openModal(`<h3>Detail mutasi</h3>
+  openModal('Detail mutasi',`<h3>Detail mutasi</h3>
     <p class="hint">Seluruh field yang dikembalikan Merchant Analytics.</p>
-    <div class="kv"><span>Status</span><span class="pill ${t.settled?'p-PAID':'p-CANCELLED'}">${t.status||'—'}</span></div>
-    <div class="kv"><span>Nominal</span><span><b>${rp(t.amount)}</b> <span style="color:var(--muted);font-size:12px">(dilaporkan ${t.amount_raw})</span></span></div>
-    <div class="kv"><span>ID mutasi</span><span class="mono" style="font-size:11px">${t.id}</span></div>
-    <div class="kv"><span>Order ID GoPay</span><span class="mono" style="font-size:11px">${t.order_id||'—'}</span></div>
-    <div class="kv"><span>Referensi</span><span class="mono">${t.reference||'—'}</span></div>
-    <div class="kv"><span>Jenis</span><span>${dt.payment_type||'—'}${dt.service_type&&dt.service_type!==dt.payment_type?' · '+dt.service_type:''}</span></div>
-    <div class="kv"><span>Penerbit QRIS</span><span>${dt.qris_issuer||'—'}</span></div>
-    <div class="kv"><span>Waktu transaksi</span><span class="mono" style="font-size:12px">${t.transaction_time||'—'}</span></div>
-    <div class="kv"><span>Kedaluwarsa QR</span><span class="mono" style="font-size:12px">${dt.expire_time||'—'}</span></div>
-    <div class="kv"><span>Merchant</span><span class="mono">${dt.merchant_id||'—'}</span></div>
-    <div class="kv"><span>Wallstreet ID</span><span class="mono" style="font-size:11px">${dt.wallstreet_transaction_id||'—'}</span></div>
-    ${dt.promo&&dt.promo.promo_code?`<div class="kv"><span>Promo</span><span>${dt.promo.promo_code}</span></div>`:''}
+    <div class="kv"><span>Status</span><span class="pill ${t.settled?'p-PAID':'p-CANCELLED'}">${esc(t.status||'—')}</span></div>
+    <div class="kv"><span>Nominal</span><span><b>${rp(t.amount)}</b> <span style="color:var(--muted);font-size:12px">(dilaporkan ${esc(t.amount_raw)})</span></span></div>
+    <div class="kv"><span>ID mutasi</span><span class="mono" style="font-size:11px">${esc(t.id)}</span></div>
+    <div class="kv"><span>Order ID GoPay</span><span class="mono" style="font-size:11px">${esc(t.order_id||'—')}</span></div>
+    <div class="kv"><span>Referensi</span><span class="mono">${esc(t.reference||'—')}</span></div>
+    <div class="kv"><span>Jenis</span><span>${esc(dt.payment_type||'—')}${dt.service_type&&dt.service_type!==dt.payment_type?' · '+esc(dt.service_type):''}</span></div>
+    <div class="kv"><span>Penerbit QRIS</span><span>${esc(dt.qris_issuer||'—')}</span></div>
+    <div class="kv"><span>Waktu transaksi</span><span class="mono" style="font-size:12px">${esc(t.transaction_time||'—')}</span></div>
+    <div class="kv"><span>Kedaluwarsa QR</span><span class="mono" style="font-size:12px">${esc(dt.expire_time||'—')}</span></div>
+    <div class="kv"><span>Merchant</span><span class="mono">${esc(dt.merchant_id||'—')}</span></div>
+    <div class="kv"><span>Wallstreet ID</span><span class="mono" style="font-size:11px">${esc(dt.wallstreet_transaction_id||'—')}</span></div>
+    ${dt.promo&&dt.promo.promo_code?`<div class="kv"><span>Promo</span><span>${esc(dt.promo.promo_code)}</span></div>`:''}
     <h3 style="font-size:14px;margin:18px 0 6px">Linimasa</h3>${hist}
     <div class="row"><button class="btn" id="dClose">Tutup</button></div>`);
   $('dClose').onclick=closeModal;
@@ -1210,12 +1360,12 @@ let qPoll=null;
 function stopPoll(){ if(qPoll){clearInterval(qPoll);qPoll=null;} }
 
 function paidModal(inv){
-  openModal(`<h3 style="color:var(--ok)">✓ Pembayaran diterima</h3>
+  openModal('Pembayaran diterima',`<h3 style="color:var(--ok-ink)">✓ Pembayaran diterima</h3>
     <p class="hint">Terdeteksi otomatis oleh rekonsiliasi — tanpa aksi manual.</p>
     <div class="kv"><span>Nominal</span><span><b>${rp(inv.payable_amount)}</b></span></div>
-    <div class="kv"><span>Order</span><span class="mono">${inv.order_id}</span></div>
-    <div class="kv"><span>ID mutasi GoPay</span><span class="mono" style="font-size:11px">${inv.provider_transaction_id||'—'}</span></div>
-    <div class="kv"><span>Waktu lunas</span><span>${inv.paid_at?new Date(inv.paid_at).toLocaleString('id-ID'):'—'}</span></div>
+    <div class="kv"><span>Order</span><span class="mono">${esc(inv.order_id)}</span></div>
+    <div class="kv"><span>ID mutasi GoPay</span><span class="mono" style="font-size:11px">${esc(inv.provider_transaction_id||'—')}</span></div>
+    <div class="kv"><span>Waktu lunas</span><span>${inv.paid_at?esc(new Date(inv.paid_at).toLocaleString('id-ID')):'—'}</span></div>
     ${inv.amount_source==='MINOR_UNIT'?'<div class="kv"><span>Catatan</span><span>nominal dibaca sebagai satuan minor</span></div>':''}
     <div class="row"><button class="btn" id="pClose">Tutup</button></div>`);
   $('pClose').onclick=()=>{closeModal();boot();loadTx();};
@@ -1260,14 +1410,14 @@ function qShow(shape){
 
 function renderTags(r){
   $('qResultCard').style.display='block';
-  const rows=r.tags.map(t=>`<tr><td class="mono">${t.tag}</td><td>${t.label||'—'}</td>
-    <td class="mono">${String(t.value).replace(/</g,'&lt;')}</td></tr>`);
+  const rows=(r.tags||[]).map(t=>`<tr><td class="mono">${esc(t.tag)}</td><td>${esc(t.label||'—')}</td>
+    <td class="mono">${esc(t.value)}</td></tr>`);
   $('qTags').innerHTML=
     `<div class="kv"><span>CRC</span><span>${r.crc_ok===true?'sah':r.crc_ok===false?'TIDAK SAH':'tidak ada'}</span></div>
      <div class="kv"><span>Jenis</span><span>${r.is_static?'statis (siap dipakai gateway)':'dinamis'}</span></div>
-     <div class="kv"><span>Merchant</span><span>${r.merchant_name||'—'}${r.merchant_city?' · '+r.merchant_city:''}</span></div>
-     <div class="kv"><span>Mata uang</span><span>${r.currency||'—'}${r.currency==='360'?' (IDR)':''}</span></div>
-     <div class="kv"><span>Panjang payload</span><span>${r.length} karakter</span></div>`+
+     <div class="kv"><span>Merchant</span><span>${esc(r.merchant_name||'—')}${r.merchant_city?' · '+esc(r.merchant_city):''}</span></div>
+     <div class="kv"><span>Mata uang</span><span>${esc(r.currency||'—')}${r.currency==='360'?' (IDR)':''}</span></div>
+     <div class="kv"><span>Panjang payload</span><span>${Number(r.length)||0} karakter</span></div>`+
     table('<th>Tag</th><th>Arti</th><th>Nilai</th>',rows,'');
 }
 
@@ -1304,19 +1454,19 @@ async function loadSession(){
   try{
     const d=await api('/hehehe/api/gopay/session');
     if(!d.connected){
-      $('sessBox').innerHTML=`<p class="empty">Belum tersambung${d.reason?' — '+d.reason:''}. Login OTP di bawah.</p>`;
+      $('sessBox').innerHTML=`<p class="empty">Belum tersambung${d.reason?' — '+esc(d.reason):''}. Login OTP di bawah.</p>`;
       return;
     }
     const exp=new Date(d.expires_at);
     const jam=Math.round((exp-Date.now())/3600000);
     $('sessBox').innerHTML=`
-      <div class="kv"><span>Nomor HP</span><span class="mono">${d.phone_number||'—'}</span></div>
-      <div class="kv"><span>Merchant ID</span><span class="mono">${d.merchant_id||'—'}</span></div>
-      <div class="kv"><span>Outlet</span><span>${d.outlet_name||'—'}</span></div>
+      <div class="kv"><span>Nomor HP</span><span class="mono">${esc(d.phone_number||'—')}</span></div>
+      <div class="kv"><span>Merchant ID</span><span class="mono">${esc(d.merchant_id||'—')}</span></div>
+      <div class="kv"><span>Outlet</span><span>${esc(d.outlet_name||'—')}</span></div>
       <div class="kv"><span>Refresh token</span><span>${d.has_refresh_token?'ada — sesi bisa diperpanjang':'TIDAK ADA — akan butuh OTP ulang'}</span></div>
-      <div class="kv"><span>Token berlaku sampai</span><span>${exp.toLocaleString('id-ID')} (${jam} jam lagi)</span></div>
-      ${d.last_profile_error?`<div class="kv"><span>Profil gagal diambil</span><span style="color:var(--bad-ink)">${d.last_profile_error}</span></div>`:''}`;
-  }catch(e){$('sessBox').innerHTML=`<p class="empty">${e.message}</p>`;}
+      <div class="kv"><span>Token berlaku sampai</span><span>${esc(exp.toLocaleString('id-ID'))} (${jam} jam lagi)</span></div>
+      ${d.last_profile_error?`<div class="kv"><span>Profil gagal diambil</span><span style="color:var(--bad-ink)">${esc(d.last_profile_error)}</span></div>`:''}`;
+  }catch(e){$('sessBox').innerHTML=`<p class="empty">${esc(e.message)}</p>`;}
 }
 
 $('sRefresh').onclick=async()=>{
@@ -1326,18 +1476,19 @@ $('sRefresh').onclick=async()=>{
 };
 $('sProfile').onclick=async()=>{
   try{const d=await api('/hehehe/api/gopay/session/profile',{method:'POST'});
-    msg($('sessMsg'),`Profil terambil: ${d.merchant.outletName||'(tanpa nama outlet)'}`,true);loadSession();}
+    const outlet=d.merchant&&d.merchant.outletName?d.merchant.outletName:'(tanpa nama outlet)';
+    msg($('sessMsg'),`Profil terambil: ${outlet}`,true);loadSession();}
   catch(e){msg($('sessMsg'),e.message,false);}
 };
 $('sTx').onclick=async()=>{
   try{
     const d=await api('/hehehe/api/gopay/transactions?limit=20');
     $('txBox').innerHTML=d.count?table('<th>ID mutasi</th><th class="num">Nominal terbaca</th><th>Waktu</th>',
-      d.transactions.map(t=>`<tr><td class="mono">${t.id}</td>
+      (d.transactions||[]).map(t=>`<tr><td class="mono">${esc(t.id)}</td>
         <td class="num">${rp(t.amount)}</td>
-        <td class="mono">${t.transaction_time||'—'}</td></tr>`),'')
+        <td class="mono">${esc(t.transaction_time||'—')}</td></tr>`),'')
       :'<p class="empty">Tidak ada mutasi terbaca.</p>';
-    msg($('sessMsg'),`${d.count} mutasi terbaca dari GoPay.`,true);
+    msg($('sessMsg'),`${Number(d.count)||0} mutasi terbaca dari GoPay.`,true);
   }catch(e){msg($('sessMsg'),e.message,false);$('txBox').innerHTML='';}
 };
 
@@ -1354,28 +1505,29 @@ $('wipeTest').onclick=()=>{
 
 // ── Pengaturan ──
 function fieldFor(it){
-  const id='set_'+it.key;
+  const id='set_'+String(it.key).replace(/[^a-zA-Z0-9_-]/g,'_');
+  const key=esc(it.key);
   if(it.type==='bool'){
     const on=String(it.value).toLowerCase()==='true';
-    return `<select id="${id}" class="field" data-key="${it.key}">
+    return `<select id="${id}" class="field" data-key="${key}">
       <option value="true"${on?' selected':''}>Aktif</option>
       <option value="false"${!on?' selected':''}>Nonaktif</option></select>`;
   }
   if(it.type==='secret'){
-    return `<input id="${id}" class="field" type="password" data-key="${it.key}" data-secret="1"
+    return `<input id="${id}" class="field" type="password" data-key="${key}" data-secret="1"
       placeholder="${it.set?'••••••  (sudah terisi, kosongkan untuk membiarkan)':'belum diisi'}">`;
   }
   return `<input id="${id}" class="field" type="${it.type==='int'?'number':'text'}"
-    data-key="${it.key}" value="${esc(it.value??'')}">`;
+    data-key="${key}" value="${esc(it.value??'')}">`;
 }
 
 async function loadSettings(){
   const d=await api('/hehehe/api/settings');
-  $('settings').innerHTML=d.groups.map(g=>`
+  $('settings').innerHTML=(d.groups||[]).map(g=>`
     <div style="margin-bottom:26px">
-      <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 10px">${g.label}</h3>
-      ${g.items.map(it=>`<label for="set_${it.key}">${it.label}
-        <span style="opacity:.6;font-weight:400"> · ${it.source}</span></label>${fieldFor(it)}`).join('')}
+      <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 10px">${esc(g.label)}</h3>
+      ${(g.items||[]).map(it=>{const id='set_'+String(it.key).replace(/[^a-zA-Z0-9_-]/g,'_');return `<label for="${id}">${esc(it.label)}
+        <span style="opacity:.6;font-weight:400"> · ${esc(it.source)}</span></label>${fieldFor(it)}`;}).join('')}
     </div>`).join('');
 }
 
