@@ -51,6 +51,10 @@ function buildApp({ pool, runtime, log = console.log }) {
       res.status(503).json({ success: false, errors: [{ message: 'Database tidak dapat dijangkau' }] });
     }
   });
+  // Bare-domain entry: send human visitors to the existing admin console.
+  // Keep the target origin-relative so the same build works behind every proxy.
+  app.get('/', (req, res) => res.redirect(302, '/hehehe'));
+
 
   // Webhook provider TIDAK memakai API key: pengirimnya provider, bukan klien.
   // Keasliannya dibuktikan dengan menanyakan ulang status ke provider.

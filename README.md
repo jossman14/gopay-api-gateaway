@@ -53,6 +53,11 @@ menulis membuka jendela balapan; dengan uang, jendela itu berarti dobel kredit.
 Kelimanya punya uji integrasi terhadap PostgreSQL asli di
 `test/invoices.integration.test.js`.
 
+## Titik masuk
+
+`GET /` mengarahkan browser sementara (`302`) ke konsol admin di `/hehehe`.
+Health check tetap tersedia di `GET /health`.
+
 ## API
 
 Semua permintaan klien memakai header `X-API-Key`. Setiap klien hanya melihat
